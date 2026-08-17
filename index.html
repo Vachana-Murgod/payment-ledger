@@ -121,8 +121,16 @@ label{display:block;font-size:11px;font-weight:600;margin:13px 0 5px}input,selec
 
       <div id="import-section" class="import-box">
         <label style="margin-top:0">Bulk import</label>
-        <p>Upload Excel/CSV. Accepted columns: Customer, NBFC, Invoice, Amount, Due Date, Notes, Status. If the file has no NBFC column, first select Monedo, Blacksoil, Fintree, or Term Loan; imported customers will automatically appear under that lender. The uploaded filename is also checked for the lender name. Dates such as <b>25/11/2026</b>, <b>25-11-2026</b>, ISO dates, and Excel dates are converted safely before Supabase insert.</p>
-        <button id="import-btn" class="btn btn-ghost" style="width:100%">Import Excel / CSV</button>
+        <p>Upload Excel/CSV. Accepted columns: Customer, NBFC, Invoice, Amount, Due Date, Notes, Status. If the file has its own NBFC column, that value wins for each row. Otherwise, pick the lender below and every row in this file will be tagged with it.</p>
+        <label style="margin-top:10px">This file is for</label>
+        <select id="import-nbfc" style="width:100%;padding:9px 10px;border:1px solid #cfc6ad;border-radius:4px;background:#fff;color:var(--ink);font-size:13px">
+          <option value="">Detect automatically (from filename)</option>
+          <option value="Monedo">Monedo</option>
+          <option value="Blacksoil">Blacksoil</option>
+          <option value="Fintree">Fintree</option>
+          <option value="Term Loan">Term Loan</option>
+        </select>
+        <button id="import-btn" class="btn btn-ghost" style="width:100%;margin-top:10px">Import Excel / CSV</button>
         <input id="import-file" type="file" accept=".xlsx,.xls,.csv" style="display:none">
         <div id="import-status" style="font-size:12px;margin-top:8px"></div>
       </div>
@@ -197,7 +205,7 @@ const ones=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","T
 const tens=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
 function two(n){return n<20?ones[n]:tens[Math.floor(n/10)]+(n%10?" "+ones[n%10]:"")}
 function three(n){let h=Math.floor(n/100),r=n%100,s=h?ones[h]+" Hundred":"";return s+(r?(s?" ":"")+two(r):"")}
-function indianWords(n){n=Math.round(Number(n)||0);if(!n)return"Zero Rupees Only";let c=Math.floor(n/1e7);n%=1e7,l=Math.floor(n/1e5);n%=1e5,t=Math.floor(n/1e3);n%=1e3;let a=[];if(c)a.push(three(c)+" Crore");if(l)a.push(three(l)+" Lakh");if(t)a.push(three(t)+" Thousand");if(n)a.push(three(n));return a.join(" ")+" Rupees Only"}
+function indianWords(n){n=Math.round(Number(n)||0);if(!n)return"Zero Rupees Only";let c=Math.floor(n/1e7);n%=1e7;let l=Math.floor(n/1e5);n%=1e5;let t=Math.floor(n/1e3);n%=1e3;let a=[];if(c)a.push(three(c)+" Crore");if(l)a.push(three(l)+" Lakh");if(t)a.push(three(t)+" Thousand");if(n)a.push(three(n));return a.join(" ")+" Rupees Only"}
 function fmtDate(s){if(!s)return"—";const p=s.split("-");return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:s}
 function banner(msg,type="ok"){ $("save-banner").classList.add("show");$("banner").className="banner "+type;$("banner").textContent=msg;if(type==="ok")setTimeout(()=>$("save-banner").classList.remove("show"),2500)}
 
@@ -353,6 +361,7 @@ $("import-file").onchange=async e=>{
     const map={};Object.keys(rows[0]).forEach(h=>{const k=keyFor(h);if(k&&!map[k])map[k]=h});
     if(!map.customer)throw new Error('Could not find a Customer column.');
     const batchId=uid();const batch=batchId+"::"+file.name;const toAdd=[],skipped=[];
+    const explicitNbfc=$("import-nbfc").value;
     rows.forEach((row,i)=>{
       const customer=String(row[map.customer]||"").trim(),a=map.amount?amount(row[map.amount]):null;
       if(!customer){skipped.push("Row "+(i+2)+": missing customer");return}
@@ -367,21 +376,24 @@ $("import-file").onchange=async e=>{
        });
        if(km) nbfc=km;
 
-       // If the file has no usable lender value, use the selected lender tab.
-       // Finally, use the filename as a fallback.
+       // If the row itself has no usable NBFC value, use what was explicitly
+       // picked in the "This file is for" dropdown. Filename is a last resort.
        if(!nbfc){
-         const active=String(state.nbfc||"").toLowerCase();
-         const selected=known.find(x=>x.toLowerCase()===active);
          const fileName=file.name.toLowerCase();
-         const fromFile=known.find(x=>fileName.includes(x.toLowerCase()));
-         nbfc=selected || fromFile || "";
+         const fromFile=known.find(x=>fileName.includes(x.toLowerCase().replace(/\s+/g,"")) || fileName.includes(x.toLowerCase()));
+         nbfc=explicitNbfc || fromFile || "";
        }
       let st="pending";if(map.status&&String(row[map.status]||"").trim().toLowerCase()==="paid")st="paid";
       toAdd.push({id:uid(),customer,nbfc,invoice:map.invoice?String(row[map.invoice]||"").trim():"",amount:a,due:map.due?parseDate(row[map.due]):"",notes:map.notes?String(row[map.notes]||"").trim():"",screenshot:null,status:st,createdAt:Date.now()+i,batch});
     });
     if(!toAdd.length)throw new Error("Nothing valid to import.");
     $("import-status").textContent=`Importing ${toAdd.length} entries…`;
-    await insertRecords(toAdd);await refresh();$("import-status").textContent=`Imported ${toAdd.length} entries${skipped.length?` • Skipped ${skipped.length}`:""}.`;banner("Import completed.");
+    await insertRecords(toAdd);await refresh();
+    const nbfcCounts={};toAdd.forEach(r=>{const k=r.nbfc||"(none)";nbfcCounts[k]=(nbfcCounts[k]||0)+1});
+    const nbfcSummary=Object.keys(nbfcCounts).map(k=>`${k}: ${nbfcCounts[k]}`).join(", ");
+    $("import-status").textContent=`Imported ${toAdd.length} entries (${nbfcSummary})${skipped.length?` • Skipped ${skipped.length}`:""}.`;
+    $("import-nbfc").value="";
+    banner("Import completed.");
   }catch(e){$("import-status").textContent="Import failed: "+e.message;$("import-status").style.color="var(--warn)"}
 };
 
