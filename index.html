@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sterlion Finance — Payment Ledger</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root{--ink:#101a2c;--ink-soft:#4a5568;--paper:#f7f2e7;--white:#fff;--line:#ddd1b0;--gold:#b8863b;--gold-deep:#8c6428;--ok:#3f6d5c;--warn:#a23b3b;--pending:#f0ead9}
+*{box-sizing:border-box}html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:Inter,Arial,sans-serif}
+body.auth-required #app,body.auth-required #userbar{visibility:hidden} body.authenticated #auth-gate{display:none!important}
+#auth-gate{position:fixed;inset:0;background:var(--paper);z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px}
+.auth-card{width:min(430px,100%);background:#fff;border:1px solid var(--line);border-radius:8px;padding:30px;box-shadow:0 15px 50px #101a2c18}
+.auth-card h2{font-family:Fraunces,serif;font-size:28px;margin:0 0 8px}.auth-card p{font-size:12px;color:var(--ink-soft);line-height:1.5}
+.auth-card label{display:block;font-size:11px;margin:14px 0 5px}.auth-card input{width:100%;padding:11px;border:1px solid #cfc6ad;border-radius:4px;font-size:14px}
+.auth-card button{width:100%;padding:11px;margin-top:16px;border:0;border-radius:4px;background:var(--ink);color:#fff;cursor:pointer}
+.auth-error{color:var(--warn);font-size:12px;margin-top:10px;min-height:18px}
+#userbar{position:fixed;right:18px;top:15px;z-index:9000;background:#fff;border:1px solid var(--line);border-radius:5px;padding:7px 9px;font:11px "IBM Plex Mono",monospace;display:none}
+body.authenticated #userbar{display:block}.user-role{color:var(--gold-deep);font-weight:600}.userbar-btn{border:0;background:var(--ink);color:#fff;padding:5px 8px;margin-left:8px;border-radius:3px;cursor:pointer}
+
+#app{min-height:100vh;padding-bottom:60px}
+.header{background:var(--ink);color:#fff;padding:20px 32px 22px;position:relative}
+.header:after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:repeating-linear-gradient(90deg,var(--gold) 0 10px,transparent 10px 20px);opacity:.75}
+.header-inner{max-width:1280px;margin:auto}
+.brand-row{display:flex;align-items:center;gap:18px}
+.title-block h1{font:600 27px Fraunces,serif;margin:0;letter-spacing:.01em}
+.stats{display:flex;gap:34px;margin-top:18px;flex-wrap:wrap}.stat-label{font:10px "IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:.1em;opacity:.65}.stat-value{font:600 21px "IBM Plex Mono",monospace;margin-top:3px}.gold{color:var(--gold)}.green{color:#8fd6bb}
+
+.notice{max-width:1280px;margin:0 auto;padding:12px 32px;font-size:11px;color:var(--ink-soft)}
+.layout{max-width:1280px;margin:0 auto;padding:0 32px;display:grid;grid-template-columns:330px 1fr;gap:28px}
+.card{background:#fffdf8;border:1px solid var(--line);border-radius:6px;padding:20px}.card h2,.ledger-title{font:600 20px Fraunces,serif;margin:0}.sub{font-size:11.5px;color:var(--ink-soft);line-height:1.45;margin:5px 0 17px}
+label{display:block;font-size:11px;font-weight:600;margin:13px 0 5px}input,select,textarea{width:100%;padding:9px 10px;border:1px solid #cfc6ad;border-radius:4px;background:#fff;color:var(--ink);font:13px Inter,Arial,sans-serif}textarea{min-height:70px;resize:vertical}
+.amount-words{font:11px "IBM Plex Mono",monospace;color:var(--gold-deep);min-height:16px;margin-top:5px}
+.btn{border:0;border-radius:4px;padding:9px 12px;cursor:pointer;font:600 11px "IBM Plex Mono",monospace}.btn-primary{width:100%;margin-top:16px;background:var(--ink);color:#fff}.btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--line)}.btn-gold{background:var(--gold);color:#fff}.btn-danger{background:var(--warn);color:#fff}
+.dropzone{border:1.5px dashed var(--line);padding:15px;text-align:center;border-radius:4px;background:#fbf8f1;cursor:pointer;font-size:12px;color:var(--ink-soft)}.dropzone b{color:var(--gold-deep)}
+.form-error,.form-msg{font-size:12px;margin-top:9px}.form-error{color:var(--warn)}.form-msg{color:var(--ok)}
+.save-banner{display:none;max-width:1280px;margin:0 auto 12px;padding:0 32px}.save-banner.show{display:block}.banner{padding:9px 12px;border-radius:4px;font-size:12px}.banner.ok{background:#e4ede9;color:var(--ok)}.banner.error{background:#f3e3e0;color:var(--warn)}
+
+.ledger-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}.controls{display:flex;gap:7px;flex-wrap:wrap}.filter-btn{border:1px solid var(--line);background:transparent;border-radius:18px;padding:6px 11px;font:10px "IBM Plex Mono",monospace;text-transform:uppercase;cursor:pointer;color:var(--ink-soft)}.filter-btn.active{background:var(--ink);color:#fff;border-color:var(--ink)}.search{width:210px;border-radius:18px}
+.nbfc-row{margin-bottom:14px}
+.ledger{border-top:1px solid var(--line)}.row{display:grid;grid-template-columns:70px 1fr auto auto auto;gap:14px;align-items:center;padding:13px 5px;border-bottom:1px solid #e7dfca;cursor:pointer}.thumb{width:60px;height:45px;object-fit:cover;border-radius:3px;border:1px solid var(--line)}.thumb.placeholder{display:flex;align-items:center;justify-content:center;background:#f1ecdf;color:#aaa}.customer{font-weight:600;font-size:13px}.meta{font:10px "IBM Plex Mono",monospace;color:var(--ink-soft);margin-top:3px}.remark-preview{font-size:11px;color:var(--gold-deep);margin-top:3px;font-style:italic}.amount{font:600 13px "IBM Plex Mono",monospace}.status{font:10px "IBM Plex Mono",monospace;text-transform:uppercase;padding:4px 7px;border-radius:12px;background:var(--pending)}.status.paid{background:#e4ede9;color:var(--ok)}.status.overdue{background:#f3e3e0;color:var(--warn)}.status.partial{background:#fbe9c8;color:#8a5a00}.detail{grid-column:1/-1;border-top:1px dashed var(--line);padding:13px 0 3px;display:grid;grid-template-columns:1fr 220px;gap:18px}.detail-notes{font-size:12px;color:var(--ink-soft);line-height:1.5}.detail-proof img{width:100%;border:1px solid var(--line);border-radius:4px}.detail-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.empty{text-align:center;padding:50px 20px;color:var(--ink-soft)}.empty .big{font:20px Fraunces,serif;color:var(--ink);margin-bottom:5px}.loading{text-align:center;padding:50px;color:var(--ink-soft);font:12px "IBM Plex Mono",monospace}
+
+.import-box{margin-top:20px;padding-top:18px;border-top:1px dashed var(--line)}.import-box p{font-size:11px;color:var(--ink-soft);line-height:1.45}.import-files{margin-top:18px}.import-file-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #e7dfca}.import-file-name{font-size:12px;font-weight:700;overflow-wrap:anywhere}.import-file-meta{font:10px "IBM Plex Mono",monospace;color:var(--ink-soft);margin-top:3px}.term-box{margin-top:20px;border:1px solid #d8c49a;background:#fffaf0;border-radius:6px;padding:14px}.term-box h3{font:600 17px Fraunces,serif;margin:0 0 5px}.term-box p{font-size:11px;color:var(--ink-soft);margin:0 0 10px}
+.mis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px}.mis-card{background:#fffdf8;border:1px solid var(--line);border-radius:6px;padding:16px}.mis-card h4{font:600 16px Fraunces,serif;margin:0 0 10px}.mis-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-top:1px solid #efe6d0}.mis-row:first-of-type{border-top:0}.mis-row b{font-family:"IBM Plex Mono",monospace}.mis-total{margin-top:4px;padding-top:10px;border-top:2px solid var(--gold);font-size:14px;font-weight:700;display:flex;justify-content:space-between}
+.term-schedule-wrap{background:#fffdf8;border:1px solid var(--line);border-radius:6px;padding:16px;overflow-x:auto}.term-schedule-wrap h3{font:600 18px Fraunces,serif;margin:0 0 3px}.term-schedule-wrap>p{font-size:11.5px;color:var(--ink-soft);margin:0 0 14px}
+table.term-schedule-table{border-collapse:collapse;width:100%;min-width:900px;font-size:12px}
+table.term-schedule-table th{background:#dcebf7;color:#16324a;font:600 11px "IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:.02em;padding:9px 10px;border:1px solid #b9cfe0;text-align:center;white-space:nowrap}
+table.term-schedule-table td{padding:8px 10px;border:1px solid #d7e3ee;text-align:center;white-space:nowrap}
+table.term-schedule-table td:nth-child(2){text-align:left;font-weight:600}
+table.term-schedule-table td:nth-child(1){color:var(--ink-soft)}
+table.term-schedule-table tbody tr:nth-child(even){background:#f4f9fd}
+table.term-schedule-table td.emi-paid{background:#3f6d5c;color:#fff;font-weight:600}
+table.term-schedule-table td.emi-next{background:#fbe9c8;color:#8a5a00;font-weight:700}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.brand-row{align-items:flex-start}.row{grid-template-columns:55px 1fr auto}.row>.status{grid-column:3}.detail{grid-template-columns:1fr}.search{width:100%}}
+@media(max-width:600px){.header,.layout,.notice{padding-left:15px;padding-right:15px}.title-block h1{font-size:21px}.stats{gap:20px}.row{grid-template-columns:50px 1fr}.amount{grid-column:2}.status{grid-column:2!important;justify-self:start}}
+body.team-view #new-entry-card{display:none}
+body.team-view .layout{grid-template-columns:1fr}
+.btn-danger:disabled{opacity:.55;cursor:wait}.delete-policy-help{margin-top:10px;padding:8px 10px;border:1px solid #e8d7b7;background:#fffaf0;border-radius:5px;font-size:10px;line-height:1.45;color:#6d6252}.delete-policy-help code{font-family:monospace}</style>
+</head>
+<body class="auth-required">
+
+<div id="auth-gate">
+  <div class="auth-card">
+    <h2>Payment Ledger Login</h2>
+    <p>Sign in to continue.</p>
+    <label>Email</label><input id="auth-email" type="email" autocomplete="username" placeholder="Email">
+    <label>Password</label><input id="auth-password" type="password" autocomplete="current-password" placeholder="Password">
+    <button id="auth-login">Sign in</button>
+    <button id="team-view-btn" class="btn btn-ghost" style="width:100%;margin-top:8px">Team View — Read Only</button>
+    <div id="auth-error" class="auth-error"></div>
+  </div>
+</div>
+
+<div id="team-pin-gate" style="display:none;position:fixed;inset:0;background:var(--paper);z-index:100000;align-items:center;justify-content:center;padding:24px">
+  <div class="auth-card">
+    <h2>Team View</h2><p>Enter the team-view PIN.</p>
+    <input id="team-pin" type="password" placeholder="PIN">
+    <button id="team-pin-btn">View Ledger</button>
+    <div id="team-pin-error" class="auth-error"></div>
+  </div>
+</div>
+
+<div id="userbar"><span id="auth-user-email"></span> <span id="auth-role" class="user-role"></span><button id="auth-logout" class="userbar-btn">Sign out</button></div>
+
+<div id="app">
+  <header class="header">
+    <div class="header-inner">
+      <div class="brand-row">
+        <div class="title-block">
+          <h1>Sterlion Finance Private Limited</h1>
+        </div>
+      </div>
+      <div class="stats">
+        <div><div class="stat-label">Entries</div><div id="stat-count" class="stat-value">—</div></div>
+        <div><div class="stat-label">Outstanding</div><div id="stat-outstanding" class="stat-value gold">—</div></div>
+        <div><div class="stat-label">Collected</div><div id="stat-collected" class="stat-value green">—</div></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="notice">Shared payment ledger. Monedo, Blacksoil, Fintree and Term Loan are kept in separate filters. Imported files are stored as batches and can be deleted completely by Admin.</div>
+  <div id="save-banner" class="save-banner"><div id="banner" class="banner"></div></div>
+
+  <main class="layout">
+    <section class="card" id="new-entry-card">
+      <h2 id="form-title">New Entry</h2>
+      <p class="sub">Add a customer due/payment or update a Term Loan payment.</p>
+
+      <label>Customer name</label><input id="f-customer" placeholder="Customer name">
+      <label>Loan / NBFC</label>
+      <select id="f-nbfc">
+        <option value="">Select…</option>
+        <option>Monedo</option><option>Blacksoil</option><option>Fintree</option><option>Term Loan</option>
+      </select>
+      <label>Invoice / Reference No.</label><input id="f-invoice" placeholder="Invoice / reference">
+      <label>Customer WhatsApp number (optional)</label><input id="f-phone" placeholder="e.g. 919876543210 (with country code)">
+      <label>Customer email (optional)</label><input id="f-email" type="email" placeholder="e.g. accounts@customer.com">
+      <label>Virtual Account No. (optional)</label><input id="f-van" placeholder="e.g. MONEDOSC48676">
+      <label>Amount (₹)</label><input id="f-amount" type="number" min="0" step="0.01" placeholder="Amount">
+      <div id="amount-words" class="amount-words"></div>
+      <p style="font-size:11px;color:var(--ink-soft);margin:0 0 10px">Part payments are recorded separately on the entry itself (Edit → Record Payment) once it's saved, so each payment can have its own screenshot.</p>
+      <div id="tenure-hint" style="font-size:11px;color:var(--gold-deep);margin:-6px 0 6px;display:none"></div>
+      <label>Disbursement date (SCF products — Monedo/Fintree/Blacksoil; leave blank for Term Loan)</label><input id="f-disb" type="text" placeholder="dd/mm/yyyy or 2-Aug-2026">
+      <label>Due date</label><input id="f-due" type="text" placeholder="dd/mm/yyyy or 2-Aug-2026">
+      <label>ROI % per annum (leave 0 if no daily interest applies)</label><input id="f-roi" type="number" min="0" step="0.01" placeholder="0" value="0">
+      <label>Previous interest already billed (₹, optional)</label><input id="f-previnterest" type="number" min="0" step="0.01" placeholder="0" value="0">
+      <label>Remarks (team-visible payment update)</label><textarea id="f-notes" placeholder="e.g. Customer confirmed payment by Friday"></textarea>
+      <label>Payment proof (optional)</label>
+      <div id="dropzone" class="dropzone"><b>Click to upload</b> or drop screenshot here</div>
+      <input id="f-file" type="file" accept="image/*" style="display:none">
+      <div id="form-error" class="form-error" style="display:none"></div>
+      <div id="form-msg" class="form-msg" style="display:none"></div>
+      <button id="submit-btn" class="btn btn-primary">Save entry</button>
+      <button id="cancel-edit" class="btn btn-ghost" style="display:none;width:100%;margin-top:8px">Cancel edit</button>
+
+      <div id="import-section" class="import-box">
+        <label style="margin-top:0">Bulk import</label>
+        <p>Upload one Excel/CSV file with as many columns as you have — Customer, NBFC, Invoice, Amount / Disb. Amt, O/S Principal, Due Date, Disbursement Date, ROI %, Previous Interest, Phone, VAN, Notes, Status. Missing columns are simply skipped. If an invoice number in the file already exists in the ledger, that entry is <b>updated in place</b> (not duplicated) — so you can re-upload the same file later with extra columns filled in and it will just fill in the gaps.</p>
+        <label style="margin-top:10px">This file is for</label>
+        <select id="import-nbfc" style="width:100%;padding:9px 10px;border:1px solid #cfc6ad;border-radius:4px;background:#fff;color:var(--ink);font-size:13px">
+          <option value="">Detect automatically (from filename)</option>
+          <option value="Monedo">Monedo</option>
+          <option value="Blacksoil">Blacksoil</option>
+          <option value="Fintree">Fintree</option>
+          <option value="Term Loan">Term Loan</option>
+        </select>
+        <button id="import-btn" class="btn btn-ghost" style="width:100%;margin-top:10px">Import Excel / CSV</button>
+        <input id="import-file" type="file" accept=".xlsx,.xls,.csv" style="display:none">
+        <div id="import-status" style="font-size:12px;margin-top:8px"></div>
+      </div>
+
+      <div id="van-section" class="import-box">
+        <label style="margin-top:0">Update Contact Details & VAN</label>
+        <p>Upload a file with columns customer_name plus any of Phone / Email / Virtual Account Number (and optionally IFSC code / Beneficiary Name). Matches each customer already in the ledger by name and fills these in on every one of their invoices — handy for loading up call/email lists in bulk.</p>
+        <select id="van-nbfc" style="width:100%;padding:9px 10px;border:1px solid #cfc6ad;border-radius:4px;background:#fff;color:var(--ink);font-size:13px">
+          <option value="">Apply to: all NBFCs (match by name only)</option>
+          <option value="Monedo">Apply to: Monedo entries only</option>
+          <option value="Blacksoil">Apply to: Blacksoil entries only</option>
+          <option value="Fintree">Apply to: Fintree entries only</option>
+          <option value="Term Loan">Apply to: Term Loan entries only</option>
+        </select>
+        <button id="van-btn" class="btn btn-ghost" style="width:100%;margin-top:10px">Update Contact & VAN from file</button>
+        <input id="van-file" type="file" accept=".xlsx,.xls,.csv" style="display:none">
+        <div id="van-status" style="font-size:12px;margin-top:8px"></div>
+      </div>
+
+      <div class="term-box">
+        <h3>Term Loan</h3>
+        <p>Use <b>Term Loan</b> to add a payment, update a payment, or view only Term Loan records.</p>
+        <button id="term-filter-btn" class="btn btn-gold" style="width:100%">Open Term Loan Payments</button>
+      </div>
+
+      <div id="import-files" class="import-files">
+        <h3 style="font:600 17px Fraunces,serif;margin:0 0 4px">Imported Files</h3>
+        <p style="font-size:11px;color:var(--ink-soft);margin:0 0 8px">Each import is stored as a batch. Delete a file here to remove all entries from that import.</p>
+        <div id="file-list"><div class="loading" style="padding:20px">Loading imported files…</div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="ledger-head">
+        <h2 class="ledger-title">Entries</h2>
+        <input id="search" class="search" placeholder="Search customer or invoice…">
+        <button id="group-toggle" class="filter-btn">Group by Customer</button>
+        <button id="mis-toggle" class="filter-btn">MIS Summary</button>
+        <button id="term-schedule-toggle" class="filter-btn">Term Loan Schedule</button>
+        <div class="controls">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="pending">Pending</button>
+          <button class="filter-btn" data-filter="overdue">Overdue</button>
+          <button class="filter-btn" data-filter="partial">Partially paid</button>
+          <button class="filter-btn" data-filter="paid">Paid</button>
+        </div>
+      </div>
+      <div class="controls nbfc-row">
+        <button class="filter-btn active" data-nbfc="">All</button>
+        <button class="filter-btn" data-nbfc="Monedo">Monedo</button>
+        <button class="filter-btn" data-nbfc="Blacksoil">Blacksoil</button>
+        <button class="filter-btn" data-nbfc="Fintree">Fintree</button>
+        <button class="filter-btn" data-nbfc="Term Loan">Term Loan</button>
+      </div>
+      <div id="mis-panel" style="display:none"></div>
+      <div id="term-schedule-panel" style="display:none"></div>
+      <div id="ledger" class="ledger"><div class="loading">Loading ledger…</div></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- Supabase ---------- */
+const SB_URL="https://uocykxumgbgbvzqxfugf.supabase.co";
+const SB_KEY="sb_publishable_B5XqzTHrNjPKS_72YCXBUA_aArekkB8";
+let accessToken=null,currentUser=null,currentIsAdmin=false;
+try{
+  const s=JSON.parse(localStorage.getItem("sterlion-auth-session")||"null");
+  if(s&&s.access_token) accessToken=s.access_token;
+}catch(e){}
+
+async function sb(path,options={}){
+  const headers=Object.assign({"apikey":SB_KEY,"Content-Type":"application/json","Accept":"application/json"},options.headers||{});
+  headers.Authorization="Bearer "+(accessToken||SB_KEY);
+  const res=await fetch(SB_URL+"/rest/v1/"+path,Object.assign({},options,{headers}));
+  const text=await res.text();
+  if(!res.ok) throw new Error("Supabase HTTP "+res.status+": "+text);
+  if(!text)return null; try{return JSON.parse(text)}catch(e){return text}
+}
+
+/* ---------- helpers ---------- */
+const state={records:[],filter:"all",nbfc:"",search:"",editingId:null,pendingImage:null,openId:null,groupByCustomer:false,openCustomer:null};
+const $=id=>document.getElementById(id);
+// Repayment account details per NBFC — edit these as you get details from
+// other lenders. Virtual Account No. comes from each entry's own "van"
+// field instead, since that's usually unique per customer.
+const NBFC_ACCOUNTS={
+  "Monedo":{name:"Monedo Financial Services Private Limited",ifsc:"AUBL0REMMIT"},
+  "Blacksoil":{name:"",ifsc:""},
+  "Fintree":{name:"",ifsc:""},
+  "Term Loan":{name:"",ifsc:""}
+};
+// SCF loan tenure per lender, in days from disbursement to due date.
+// Term Loan isn't a fixed-tenure SCF product — it's EMI-based instead.
+const TENURE_DAYS={"Monedo":105,"Fintree":90,"Blacksoil":120};
+// Day-count basis for daily interest — confirmed against each lender's own
+// ageing report: Blacksoil uses Actual/360, Fintree uses Actual/365 (every
+// row of their report matches this exactly). Monedo doesn't use this at all
+// (interest is deducted upfront there), so it's omitted; anything not
+// listed falls back to 360.
+const INTEREST_DAY_BASIS={"Blacksoil":360,"Fintree":365};
+// Term Loan: 10 monthly EMIs due on the 5th of each month, starting the
+// month after disbursement.
+function generateEmiSchedule(disbDate,totalAmount,months){
+  months=months||10;
+  const emiAmount=Math.round((totalAmount/months)*100)/100;
+  const start=new Date(disbDate+"T00:00:00");
+  // Disbursed after the 20th → push the first EMI out an extra month, since
+  // there isn't a full month's gap before the very next 5th. E.g. a 21 July
+  // disbursement's first EMI falls on 5 Sep, not 5 Aug.
+  const firstOffset=start.getDate()>20?2:1;
+  const schedule=[];
+  for(let i=0;i<months;i++){
+    const d=new Date(start.getFullYear(),start.getMonth()+firstOffset+i,5);
+    schedule.push({no:i+1,dueDate:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-05`,amount:emiAmount});
+  }
+  return schedule;
+}
+function nextUnpaidEmi(r){
+  if(!Array.isArray(r.emiSchedule)||!r.emiSchedule.length)return null;
+  const paidCount=Math.floor((Number(r.paidAmount)||0)/r.emiSchedule[0].amount);
+  return r.emiSchedule[paidCount]||null;
+}
+// Builds (or rebuilds) the 10-month EMI schedule for a Term Loan record
+// whenever it has both a disbursement date and an amount — called from the
+// new-entry form, the edit form, AND bulk import, so a schedule is never
+// silently missing just because it was added after the entry itself. Also
+// resyncs the visible "due" date to whichever EMI is still unpaid.
+function applyTermLoanSchedule(r){
+  if(r.nbfc==="Term Loan"&&r.disbDate&&(Number(r.amount)||0)>0){
+    r.emiSchedule=generateEmiSchedule(r.disbDate,r.amount,10);
+    const next=nextUnpaidEmi(r);
+    r.due=next?next.dueDate:r.emiSchedule[r.emiSchedule.length-1].dueDate;
+  }
+}
+function uid(){return "p"+Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+function money(n){return "₹"+(Number(n)||0).toLocaleString("en-IN",{maximumFractionDigits:0})}
+function today(){return new Date().toISOString().slice(0,10)}
+function outstandingOf(r){return Math.max(0,(Number(r.amount)||0)-(Number(r.paidAmount)||0))}
+// Simple daily interest, calculated live off today's date — no manual
+// daily updates needed. Only applies when a ROI and disbursement date are
+// set (leave blank for Monedo, where interest is deducted upfront instead).
+function interestDaysOf(r){
+  if(!r.disbDate)return 0;
+  const start=new Date(r.disbDate+"T00:00:00"),end=new Date(today()+"T00:00:00");
+  return Math.max(0,Math.round((end-start)/86400000));
+}
+// Daily interest, computed per-segment across the balance's actual history
+// — not just current outstanding × total days. A partial payment only
+// reduces the balance interest accrues on from the date it was made, not
+// retroactively for the whole period since disbursement; charging the
+// reduced balance for the full period (or the full balance after it's been
+// partly repaid) both misstate the true interest whenever a payment lands
+// mid-period. The disbursement date itself counts as Day 1 — interest uses
+// the raw calendar-day difference to each date, with no day subtracted.
+// Day-count basis (360 vs 365) is per-NBFC — see INTEREST_DAY_BASIS.
+function accruedInterestOf(r){
+  const roi=Number(r.roi)||0;
+  if(!roi||!r.disbDate)return 0;
+  const basis=INTEREST_DAY_BASIS[r.nbfc]||360;
+  const dayRate=roi/100/basis;
+  const dayDiff=(a,b)=>Math.max(0,Math.round((new Date(b+"T00:00:00")-new Date(a+"T00:00:00"))/86400000));
+  let principal=Number(r.amount)||0,cursor=r.disbDate,interest=0;
+  const pays=(Array.isArray(r.payments)?r.payments.slice():[])
+    .filter(p=>p.date&&p.date>=r.disbDate)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  for(const p of pays){
+    interest+=principal*dayRate*dayDiff(cursor,p.date);
+    principal=Math.max(0,principal-(Number(p.amount)||0));
+    cursor=p.date;
+  }
+  interest+=principal*dayRate*dayDiff(cursor,today());
+  return interest;
+}
+function totalOutstandingOf(r){
+  if(r.importedTotalOS!=null&&r.nbfc!=="Monedo"){
+    // Lender's own figure, frozen as of the last import — only adjusted for
+    // payments recorded through the app AFTER that import date, so it
+    // doesn't silently go stale but also doesn't drift from what the
+    // lender's file actually says.
+    const paidSinceImport=(Array.isArray(r.payments)?r.payments:[])
+      .filter(p=>p.date&&p.date>(r.importedAsOf||""))
+      .reduce((s,p)=>s+(Number(p.amount)||0),0);
+    return Math.max(0,r.importedTotalOS-paidSinceImport);
+  }
+  return outstandingOf(r)+accruedInterestOf(r)+(Number(r.prevInterest)||0);
+}
+// Used for dashboards/summaries only: once an entry is marked "paid", it
+// should contribute ₹0 to any outstanding total, even if leftover interest
+// wasn't separately settled. totalOutstandingOf() itself is left untouched
+// so the entry-detail view can still surface that leftover interest for
+// follow-up — this only affects the rolled-up "outstanding" figures.
+function reportableOutstandingOf(r){return statusOf(r)==="paid"?0:totalOutstandingOf(r)}
+function statusOf(r){
+  if(r.status==="paid"||outstandingOf(r)<=0)return"paid";
+  if((Number(r.paidAmount)||0)>0)return"partial";
+  if(r.due&&r.due<today())return"overdue";
+  return"pending";
+}
+function esc(v){const d=document.createElement("div");d.textContent=v==null?"":String(v);return d.innerHTML}
+const ones=["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+const tens=["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+function two(n){return n<20?ones[n]:tens[Math.floor(n/10)]+(n%10?" "+ones[n%10]:"")}
+function three(n){let h=Math.floor(n/100),r=n%100,s=h?ones[h]+" Hundred":"";return s+(r?(s?" ":"")+two(r):"")}
+function indianWords(n){n=Math.round(Number(n)||0);if(!n)return"Zero Rupees Only";let c=Math.floor(n/1e7);n%=1e7;let l=Math.floor(n/1e5);n%=1e5;let t=Math.floor(n/1e3);n%=1e3;let a=[];if(c)a.push(three(c)+" Crore");if(l)a.push(three(l)+" Lakh");if(t)a.push(three(t)+" Thousand");if(n)a.push(three(n));return a.join(" ")+" Rupees Only"}
+function fmtDate(s){if(!s)return"—";const p=s.split("-");return p.length===3?`${p[2]}-${p[1]}-${p[0]}`:s}
+// Short "5-Jul-26" style date, matching the Term Loan schedule sheet format.
+function fmtDateShort(s){
+  if(!s)return"—";
+  const d=new Date(s+"T00:00:00");
+  if(isNaN(d))return s;
+  return `${d.getDate()}-${d.toLocaleString("en-US",{month:"short"})}-${String(d.getFullYear()).slice(-2)}`;
+}
+function banner(msg,type="ok"){ $("save-banner").classList.add("show");$("banner").className="banner "+type;$("banner").textContent=msg;if(type==="ok")setTimeout(()=>$("save-banner").classList.remove("show"),2500)}
+
+/* ---------- robust date parser ---------- */
+function parseDate(v){
+  if(v===null||v===undefined||v==="")return"";
+  if(v instanceof Date&&!isNaN(v)){return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,"0")}-${String(v.getDate()).padStart(2,"0")}`}
+  if(typeof v==="number"){
+    const d=new Date(Date.UTC(1899,11,30)+v*86400000);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+  }
+  let s=String(v).trim();
+  s=s.replace(/\s+\d{1,2}:\d{2}(:\d{2})?.*$/,"");
+  // ISO yyyy-mm-dd — what native <input type="date"> fields always send.
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m)return `${m[1]}-${String(+m[2]).padStart(2,"0")}-${String(+m[3]).padStart(2,"0")}`;
+  // Only two accepted formats from here: strict dd/mm/yyyy, and d-Mon-yyyy.
+  // No mm/dd guessing, no other native-Date fallback — anything else is
+  // rejected so a wrongly-formatted import date fails loudly instead of
+  // silently landing on the wrong day.
+  m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if(m){
+    const day=+m[1],mo=+m[2],y=+m[3];
+    if(day>=1&&day<=31&&mo>=1&&mo<=12)return `${y}-${String(mo).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    return "";
+  }
+  const MONTHS={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  m=s.match(/^(\d{1,2})[\/.\- ]([A-Za-z]{3,})[\/.\- ](\d{4})$/);
+  if(m){
+    const day=+m[1],mo=MONTHS[m[2].slice(0,3).toLowerCase()],y=+m[3];
+    if(mo&&day>=1&&day<=31)return `${y}-${String(mo).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+  }
+  return "";
+}
+// Bulk-import only: some source files (e.g. bank/NBFC system exports) use
+// mm/dd/yyyy instead of dd/mm/yyyy. Rather than guess per cell, this scans
+// every value in one imported column together — if ANY value has a number
+// >12 in a given slot, that slot can only be the day, which tells us the
+// whole column's convention unambiguously. Manual form entry still only
+// ever accepts dd/mm/yyyy or d-Mon-yyyy (parseDate above) — this is purely
+// for making bulk import tolerant of files that use the other convention.
+function detectColumnDateFormat(values){
+  let sawDDMM=false,sawMMDD=false;
+  for(const raw of values){
+    const s=String(raw||"").trim();
+    const m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+    if(!m)continue;
+    const a=+m[1],b=+m[2];
+    if(a>12&&b<=12)sawDDMM=true;
+    else if(b>12&&a<=12)sawMMDD=true;
+  }
+  if(sawDDMM&&sawMMDD)return "CONFLICT";
+  if(sawMMDD)return "MM_DD";
+  return "DD_MM"; // default when nothing in the column disambiguates it
+}
+function parseDateWithFormat(v,format){
+  if(v===null||v===undefined||v==="")return"";
+  if(v instanceof Date&&!isNaN(v))return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,"0")}-${String(v.getDate()).padStart(2,"0")}`;
+  if(typeof v==="number"){
+    const d=new Date(Date.UTC(1899,11,30)+v*86400000);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+  }
+  let s=String(v).trim();
+  s=s.replace(/\s+\d{1,2}:\d{2}(:\d{2})?.*$/,"");
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m)return `${m[1]}-${String(+m[2]).padStart(2,"0")}-${String(+m[3]).padStart(2,"0")}`;
+  m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+  if(m){
+    const y=+m[3];
+    const day=format==="MM_DD"?+m[2]:+m[1];
+    const mo=format==="MM_DD"?+m[1]:+m[2];
+    if(day>=1&&day<=31&&mo>=1&&mo<=12)return `${y}-${String(mo).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    return "";
+  }
+  return parseDate(v); // d-Mon-yyyy etc. — unaffected by mm/dd vs dd/mm
+}
+function amount(v){if(typeof v==="number")return v;const n=parseFloat(String(v||"").replace(/[₹,\s]/g,""));return isNaN(n)?null:n}
+
+/* ---------- auth ---------- */
+async function login(email,password){
+  const res=await fetch(SB_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"apikey":SB_KEY,"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+  const data=await res.json();if(!res.ok)throw new Error(data.error_description||data.msg||"Login failed");
+  accessToken=data.access_token;localStorage.setItem("sterlion-auth-session",JSON.stringify({access_token:data.access_token,refresh_token:data.refresh_token}));
+  return data.user;
+}
+async function adminCheck(user){
+  try{const rows=await sb("ledger_admins?select=user_id&user_id=eq."+encodeURIComponent(user.id));return Array.isArray(rows)&&rows.some(x=>String(x.user_id)===String(user.id))}catch(e){return false}
+}
+async function applyUser(user){
+  currentUser=user;currentIsAdmin=await adminCheck(user);
+  document.body.classList.remove("auth-required");document.body.classList.add("authenticated");
+  $("auth-user-email").textContent=user.email||"";$("auth-role").textContent=currentIsAdmin?" • ADMIN":" • VIEW ONLY";
+  document.querySelectorAll("#import-section,#van-section,#import-files,.btn-danger,.edit-control,.paid-control").forEach(x=>x.style.display=currentIsAdmin?"":"none");
+  await refresh();
+}
+$("auth-login").onclick=async()=>{try{const u=await login($("auth-email").value.trim(),$("auth-password").value);await applyUser(u)}catch(e){$("auth-error").textContent=e.message}};
+$("auth-password").onkeydown=e=>{if(e.key==="Enter")$("auth-login").click()};
+$("auth-logout").onclick=()=>{localStorage.removeItem("sterlion-auth-session");location.reload()};
+
+/* Team view */
+const PIN="Sterlion@123",TEAM_EMAIL="teamview@sterlion.in",TEAM_PASSWORD="Str@123";
+$("team-view-btn").onclick=()=>{$("team-pin-gate").style.display="flex";$("team-pin").focus()};
+$("team-pin-btn").onclick=async()=>{
+  if($("team-pin").value!==PIN){$("team-pin-error").textContent="Incorrect PIN.";return}
+  try{const u=await login(TEAM_EMAIL,TEAM_PASSWORD);currentUser=u;currentIsAdmin=false;document.body.classList.remove("auth-required");document.body.classList.add("authenticated","team-view");document.querySelectorAll("#import-section,#van-section,#import-files,.edit-control,.paid-control,.btn-danger").forEach(x=>x.style.display="none");$("team-pin-gate").style.display="none";await refresh()}catch(e){$("team-pin-error").textContent="Could not open Team View."}
+};
+
+/* ---------- database records ---------- */
+async function load(){
+  const rows=await sb("payment_ledger_entries?select=*&order=created_at.desc");
+  return (rows||[]).map(r=>({id:r.id,customer:r.customer,nbfc:r.nbfc||"",invoice:r.invoice||"",amount:Number(r.amount)||0,paidAmount:Number(r.paid_amount)||0,payments:Array.isArray(r.payments)?r.payments:[],due:r.due||"",notes:r.notes||"",screenshot:r.screenshot||null,status:r.status||"pending",createdAt:Number(r.created_at)||Date.now(),batch:r.import_batch_id||"",phone:r.phone||"",email:r.email||"",van:r.van||"",roi:Number(r.roi)||0,disbDate:r.disb_date||"",prevInterest:Number(r.prev_interest)||0,emiSchedule:Array.isArray(r.emi_schedule)?r.emi_schedule:[],importedAgeDays:r.imported_age_days!=null?Number(r.imported_age_days):null,importedInterest:r.imported_interest!=null?Number(r.imported_interest):null,importedTotalOS:r.imported_total_os!=null?Number(r.imported_total_os):null,importedAsOf:r.imported_as_of||null}));
+}
+async function insertRecords(list){
+  if(!currentIsAdmin)throw new Error("Only Admin can modify entries.");
+  if(!list.length)return;
+  const rows=list.map(r=>({id:r.id,customer:r.customer,nbfc:r.nbfc||null,invoice:r.invoice||null,amount:Number(r.amount)||0,paid_amount:Number(r.paidAmount)||0,payments:r.payments||[],due:r.due||null,notes:r.notes||null,screenshot:r.screenshot||null,status:r.status||"pending",created_at:r.createdAt||Date.now(),import_batch_id:r.batch||null,phone:r.phone||null,email:r.email||null,van:r.van||null,roi:Number(r.roi)||0,disb_date:r.disbDate||null,prev_interest:Number(r.prevInterest)||0,emi_schedule:r.emiSchedule||[],imported_age_days:r.importedAgeDays!=null?r.importedAgeDays:null,imported_interest:r.importedInterest!=null?r.importedInterest:null,imported_total_os:r.importedTotalOS!=null?r.importedTotalOS:null,imported_as_of:r.importedAsOf||null}));
+  await sb("payment_ledger_entries?on_conflict=id",{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(rows)});
+}
+async function updateRecord(r){
+  if(!currentIsAdmin)throw new Error("Only Admin can modify entries.");
+  await sb("payment_ledger_entries?id=eq."+encodeURIComponent(r.id),{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify({customer:r.customer,nbfc:r.nbfc||null,invoice:r.invoice||null,amount:Number(r.amount)||0,paid_amount:Number(r.paidAmount)||0,payments:r.payments||[],due:r.due||null,notes:r.notes||null,screenshot:r.screenshot||null,status:r.status||"pending",phone:r.phone||null,email:r.email||null,van:r.van||null,roi:Number(r.roi)||0,disb_date:r.disbDate||null,prev_interest:Number(r.prevInterest)||0,emi_schedule:r.emiSchedule||[],imported_age_days:r.importedAgeDays!=null?r.importedAgeDays:null,imported_interest:r.importedInterest!=null?r.importedInterest:null,imported_total_os:r.importedTotalOS!=null?r.importedTotalOS:null,imported_as_of:r.importedAsOf||null})});
+}
+async function deleteOne(r){
+  if(!currentIsAdmin)throw new Error("Only Admin can delete entries.");
+  await sb("payment_ledger_entries?id=eq."+encodeURIComponent(r.id),{method:"DELETE"});
+}
+
+/* ---------- rendering ---------- */
+function renderEntryRow(r, container){
+  const eff=statusOf(r),row=document.createElement("div");row.className="row";
+  const out=outstandingOf(r);
+  const hasInterest=((Number(r.roi)||0)>0&&r.disbDate)||(r.importedTotalOS!=null&&r.nbfc!=="Monedo");
+  const totalOut=hasInterest?totalOutstandingOf(r):out;
+  const amountHtml=eff==="partial"?`${money(totalOut)}<div style="font-size:10px;color:var(--ink-soft);font-weight:400">of ${money(r.amount)}</div>`:(hasInterest?`${money(totalOut)}<div style="font-size:10px;color:var(--ink-soft);font-weight:400">incl. interest</div>`:money(r.amount));
+  // Ageing — prefer the lender's own reported DPD/Age exactly as given
+  // (frozen at last import) over recalculating days-since-disbursement
+  // ourselves, so the figure on screen always matches the lender's file.
+  const tenure=TENURE_DAYS[r.nbfc];
+  const daysElapsed=r.importedAgeDays!=null?r.importedAgeDays:((tenure&&r.disbDate)?interestDaysOf(r):null);
+  const overTenure=daysElapsed!==null&&tenure&&daysElapsed>tenure;
+  const ageingHtml=daysElapsed!==null?` • ${daysElapsed} days elapsed${overTenure?` (past ${tenure}d tenure)`:""}`:"";
+  const statusCls=eff+(overTenure&&eff!=="paid"?" overdue":"");
+  const contactHtml=(r.phone||r.email)?` • ${[r.phone,r.email].filter(Boolean).map(esc).join(" / ")}`:"";
+  row.innerHTML=`<div>${r.screenshot?`<img class="thumb" src="${r.screenshot}" alt="">`:`<div class="thumb placeholder">—</div>`}</div>
+    <div><div class="customer">${esc(r.customer)}</div><div class="meta">${esc(r.nbfc||"")} ${r.invoice?" • Ref "+esc(r.invoice):""} • Due ${fmtDate(r.due)}${ageingHtml}${contactHtml}</div>${r.notes?`<div class="remark-preview">📝 ${esc(r.notes)}</div>`:""}</div>
+    <div class="amount">${amountHtml}</div><div class="status ${statusCls}">${eff==="partial"?"partially paid":eff}</div>`;
+  row.addEventListener("click",()=>{
+    if(state.openId===r.id){state.openId=null;render();return}
+    state.openId=r.id;render();
+  });
+  container.appendChild(row);
+  if(state.openId===r.id){
+    const d=document.createElement("div");d.className="detail";
+    const payments=Array.isArray(r.payments)?r.payments:[];
+    const paymentsHtml=payments.length?`<div class="payments-list" style="margin-top:10px">
+        <b>Payments recorded:</b>
+        ${payments.map((p,i)=>`<div style="padding:6px 0;border-top:1px solid var(--line);font-size:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="flex:1">${money(p.amount)} — ${fmtDate(p.date)}</span>
+            ${p.screenshot?`<a href="${p.screenshot}" target="_blank"><img src="${p.screenshot}" style="width:34px;height:34px;object-fit:cover;border-radius:3px;border:1px solid var(--line)"></a>`:`<span style="color:var(--ink-soft)">no proof</span>`}
+          </div>
+          ${p.note?`<div style="color:var(--ink-soft);font-size:11px;margin-top:2px">${esc(p.note)}</div>`:""}
+        </div>`).join("")}
+      </div>`:"";
+    const paidLine=(Number(r.paidAmount)||0)>0?`<br><b>Total paid so far:</b> ${money(r.paidAmount)}`:"";
+    const interestLine=hasInterest?(r.importedTotalOS!=null
+      ?`<br><b>Outstanding (per lender's file, as of ${fmtDate(r.importedAsOf)}):</b> ${money(r.importedTotalOS)}${r.importedInterest!=null?`<br><b>Interest outstanding (per lender's file):</b> ${money(r.importedInterest)}`:""}${(Number(r.prevInterest)||0)>0?`<br><b>Previous interest carried:</b> ${money(r.prevInterest)}`:""}<br><b>Total Outstanding now:</b> ${money(totalOut)}`
+      :`<br><b>Principal outstanding:</b> ${money(out)}<br><b>ROI:</b> ${r.roi}% p.a. (Actual/${INTEREST_DAY_BASIS[r.nbfc]||360}) · <b>Days since disbursement:</b> ${interestDaysOf(r)}<br><b>Interest accrued (live estimate):</b> ${money(accruedInterestOf(r))}${(Number(r.prevInterest)||0)>0?`<br><b>Previous interest carried:</b> ${money(r.prevInterest)}`:""}<br><b>Total Outstanding (incl. interest):</b> ${money(totalOut)}`
+    ):`<br><b>Outstanding:</b> ${money(out)}`;
+    let emiLine="";
+    if(r.nbfc==="Term Loan"&&Array.isArray(r.emiSchedule)&&r.emiSchedule.length){
+      const emiAmt=r.emiSchedule[0].amount;
+      const paidCount=Math.min(r.emiSchedule.length,Math.floor((Number(r.paidAmount)||0)/emiAmt));
+      const next=nextUnpaidEmi(r);
+      emiLine=`<br><b>EMI plan:</b> ${paidCount} of ${r.emiSchedule.length} paid · ${money(emiAmt)}/month`+(next?`<br><b>Next EMI due:</b> ${fmtDate(next.dueDate)}`:"<br><b>All EMIs paid.</b>");
+    }
+    d.innerHTML=`<div><div class="detail-notes"><b>Remarks:</b> ${esc(r.notes||"No remarks added.")}${paidLine}${interestLine}${emiLine}<br><br><b>Amount in words:</b> ${indianWords(r.amount)}${paymentsHtml}</div><div class="detail-actions">
+      ${eff!=="paid"?`<button class="btn btn-gold record-payment-control">Record Payment</button><button class="btn btn-gold paid-control">Mark fully paid</button>`:""}
+      <button class="btn btn-ghost edit-control">Edit</button><button class="btn btn-danger edit-control">Delete</button>
+      <div class="record-payment-form" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">
+        <label style="font-size:11px">Payment amount (₹)</label><input type="number" min="0" step="0.01" class="rp-amount" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;margin-bottom:6px">
+        <label style="font-size:11px">Date this payment was made</label><input type="text" class="rp-date" placeholder="dd/mm/yyyy or 2-Aug-2026" value="${fmtDate(today())}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;margin-bottom:6px">
+        <label style="font-size:11px">Screenshot for this payment (optional)</label><input type="file" accept="image/*" class="rp-file" style="width:100%;margin-bottom:8px">
+        <button class="btn btn-gold rp-save" style="width:100%">Save payment</button>
+      </div>
+      <div class="disposition-box edit-control" style="width:100%;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">
+        <label style="font-size:11px">Disposition — update customer conversation / follow-up</label>
+        <textarea class="disposition-input" style="width:100%;min-height:64px;padding:8px;border:1px solid var(--line);border-radius:3px;margin-bottom:6px">${esc(r.notes||"")}</textarea>
+        <button class="btn btn-gold disposition-save">Save disposition</button>
+      </div>
+      </div></div>
+      <div class="detail-proof">${r.screenshot?`<img src="${r.screenshot}" alt="Payment proof">`:"<div class='empty' style='padding:20px'>No proof uploaded</div>"}</div>`;
+    const paid=d.querySelector(".paid-control");if(paid)paid.onclick=async e=>{e.stopPropagation();try{const remaining=outstandingOf(r);if(remaining>0){const list=Array.isArray(r.payments)?r.payments.slice():[];list.push({amount:remaining,date:today(),screenshot:null});r.payments=list}r.status="paid";r.paidAmount=r.amount;await updateRecord(r);state.openId=null;await refresh();banner("Payment marked as paid.")}catch(x){banner(x.message,"error")}};
+    const edit=d.querySelector(".edit-control");if(edit)edit.onclick=e=>{e.stopPropagation();startEdit(r)};
+    const dispSave=d.querySelector(".disposition-save");
+    if(dispSave)dispSave.onclick=async e=>{
+      e.stopPropagation();
+      const val=d.querySelector(".disposition-input").value.trim();
+      dispSave.disabled=true;dispSave.textContent="Saving…";
+      try{r.notes=val;await updateRecord(r);await refresh();banner("Disposition saved.")}
+      catch(x){banner(x.message,"error");dispSave.disabled=false;dispSave.textContent="Save disposition"}
+    };
+    const del=[...d.querySelectorAll(".btn-danger")][0];if(del)del.onclick=async e=>{e.stopPropagation();if(confirm("Delete this entry?")){try{await deleteOne(r);state.openId=null;await refresh()}catch(x){banner(x.message,"error")}}};
+    const recordBtn=d.querySelector(".record-payment-control");
+    const rpForm=d.querySelector(".record-payment-form");
+    if(recordBtn)recordBtn.onclick=e=>{e.stopPropagation();rpForm.style.display=rpForm.style.display==="none"?"block":"none"};
+    const rpSave=d.querySelector(".rp-save");
+    if(rpSave)rpSave.onclick=async e=>{
+      e.stopPropagation();
+      const amtInput=d.querySelector(".rp-amount"),fileInput=d.querySelector(".rp-file"),dateInput=d.querySelector(".rp-date");
+      const payAmt=Number(amtInput.value)||0;
+      const payDate=dateInput.value.trim()?parseDate(dateInput.value.trim()):today();
+      if(payAmt<=0){banner("Enter a valid payment amount.","error");return}
+      if(dateInput.value.trim()&&!payDate){banner("Enter the payment date as dd/mm/yyyy or e.g. 2-Aug-2026.","error");return}
+      rpSave.disabled=true;rpSave.textContent="Saving…";
+      const finish=async(screenshotData)=>{
+        const list=Array.isArray(r.payments)?r.payments.slice():[];
+        list.push({amount:payAmt,date:payDate,screenshot:screenshotData||null});
+        list.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+        r.payments=list;
+        // Add to whatever was already recorded as paid — some of that may
+        // have come from a lender's daily import (e.g. an "Amount Paid"
+        // column), which never gets logged into this payments array, so
+        // recalculating purely from the array here would silently lose it.
+        r.paidAmount=(Number(r.paidAmount)||0)+payAmt;
+        r.status=r.paidAmount>=r.amount?"paid":"pending";
+        // Term Loan: advance the due date to whichever EMI is still unpaid,
+        // so the ledger's due-date sort/filter always reflects the next
+        // installment actually owed, not the original loan due date.
+        if(r.nbfc==="Term Loan"&&Array.isArray(r.emiSchedule)&&r.emiSchedule.length){
+          const next=nextUnpaidEmi(r);
+          r.due=next?next.dueDate:r.emiSchedule[r.emiSchedule.length-1].dueDate;
+        }
+        try{await updateRecord(r);state.openId=null;await refresh();banner("Payment recorded.")}catch(x){banner(x.message,"error");rpSave.disabled=false;rpSave.textContent="Save payment"}
+      };
+      const file=fileInput.files[0];
+      if(file){
+        if(file.size>3e6){banner("Please use an image below 3 MB.","error");rpSave.disabled=false;rpSave.textContent="Save payment";return}
+        const rd=new FileReader();rd.onload=()=>finish(rd.result);rd.readAsDataURL(file);
+      }else{
+        await finish(null);
+      }
+    };
+    d.addEventListener("click",e=>e.stopPropagation());container.appendChild(d);
+  }
+}
+function buildCustomerReminder(g){
+  const byNbfc={};
+  g.entries.filter(r=>statusOf(r)!=="paid").forEach(r=>{
+    const nb=r.nbfc||"Unspecified";
+    if(!byNbfc[nb])byNbfc[nb]={entries:[],van:""};
+    byNbfc[nb].entries.push(r);
+    if(!byNbfc[nb].van&&r.van)byNbfc[nb].van=r.van;
+  });
+  const lines=[`Dear ${g.name},`,"","This is to inform you of the following pending invoices with Sterlion Finance:",""];
+  Object.keys(byNbfc).forEach(nb=>{
+    const grp=byNbfc[nb];
+    const byDue={};
+    grp.entries.forEach(r=>{
+      const d=r.due||"";
+      if(!byDue[d])byDue[d]={total:0,invoices:[]};
+      byDue[d].total+=totalOutstandingOf(r);
+      if(r.invoice)byDue[d].invoices.push(r.invoice+((Number(r.paidAmount)||0)>0?` (part-paid, ${money(totalOutstandingOf(r))} left)`:"")+((Number(r.roi)||0)>0?` (incl. accrued interest)`:""));
+    });
+    lines.push(`— ${nb} —`);
+    Object.keys(byDue).forEach(d=>{
+      const b=byDue[d];
+      lines.push(`Due ${d?fmtDate(d):"date not set"} — Total ${money(b.total)}`);
+      if(b.invoices.length)lines.push(`Invoices: ${b.invoices.join(", ")}`);
+    });
+    const acct=NBFC_ACCOUNTS[nb];
+    if(acct&&(acct.name||acct.ifsc||grp.van)){
+      lines.push("For repayment, please transfer to:");
+      if(acct.name)lines.push(`Account Name: ${acct.name}`);
+      if(grp.van)lines.push(`Virtual Account No: ${grp.van}`);
+      if(acct.ifsc)lines.push(`IFSC Code: ${acct.ifsc}`);
+    }
+    lines.push("");
+  });
+  const hasAnyInterest=g.entries.some(r=>(Number(r.roi)||0)>0&&r.disbDate);
+  lines.push(`Total payable as of today (${fmtDate(today())}): ${money(g.outstanding)}`);
+  if(hasAnyInterest)lines.push("(Interest is calculated daily, so this amount increases each day it remains unpaid.)");
+  lines.push("");
+  lines.push("Kindly ensure timely payment to avoid any inconvenience.");
+  lines.push("");
+  lines.push("Regards,");
+  lines.push("Sterlion Finance");
+  return lines.join("\n");
+}
+// True when any unpaid entry is overdue or due within the next 3 days —
+// used to decide whether the short/firm template is the better fit.
+function isNearDue(g,daysAhead){
+  daysAhead=daysAhead===undefined?3:daysAhead;
+  const t=today();
+  const cutoff=new Date(t+"T00:00:00");cutoff.setDate(cutoff.getDate()+daysAhead);
+  const cutoffStr=`${cutoff.getFullYear()}-${String(cutoff.getMonth()+1).padStart(2,"0")}-${String(cutoff.getDate()).padStart(2,"0")}`;
+  return g.entries.some(r=>statusOf(r)!=="paid"&&r.due&&r.due<=cutoffStr);
+}
+// Short, firm version for cases near/at their due date — meant to be sent
+// as-is with no editing, emphasizing there's no extension.
+function buildShortReminder(g){
+  const unpaid=g.entries.filter(r=>statusOf(r)!=="paid");
+  if(!unpaid.length)return `Dear ${g.name},\n\nAll dues are cleared. Thank you.\n\nRegards,\nSterlion Finance`;
+  const earliestDue=unpaid.reduce((min,r)=>(r.due&&(!min||r.due<min))?r.due:min,"");
+  const total=unpaid.reduce((a,r)=>a+totalOutstandingOf(r),0);
+  const isTermLoan=unpaid.every(r=>r.nbfc==="Term Loan");
+  const label=isTermLoan?"EMI":"due amount";
+  const lines=[
+    `Dear ${g.name},`,
+    "",
+    `Your ${label} of ${money(total)} is due on ${earliestDue?fmtDate(earliestDue):"the due date"}.`,
+    "",
+    "There will be no extension. Kindly clear the dues prior to the due date to avoid any inconvenience.",
+    ""
+  ];
+  const van=unpaid.find(r=>r.van)?.van;
+  const acct=NBFC_ACCOUNTS[unpaid[0].nbfc];
+  if(van||acct?.ifsc){
+    lines.push("For repayment:");
+    if(acct?.name)lines.push(acct.name);
+    if(van)lines.push(`VAN: ${van}`);
+    if(acct?.ifsc)lines.push(`IFSC: ${acct.ifsc}`);
+    lines.push("");
+  }
+  lines.push("Regards,");
+  lines.push("Sterlion Finance");
+  return lines.join("\n");
+}
+function render(){
+  const all=state.records;
+  $("stat-count").textContent=all.length;
+  $("stat-outstanding").textContent=money(all.reduce((a,r)=>a+reportableOutstandingOf(r),0));
+  $("stat-collected").textContent=money(all.reduce((a,r)=>a+(Number(r.paidAmount)||0),0));
+  const list=all.filter(r=>{
+    if(state.filter!=="all"&&statusOf(r)!==state.filter)return false;
+    if(state.nbfc&&r.nbfc!==state.nbfc)return false;
+    if(state.search&&!(`${r.customer} ${r.invoice||""} ${r.notes||""}`.toLowerCase().includes(state.search)))return false;
+    return true;
+  });
+  if(!list.length){$("ledger").innerHTML=`<div class="empty"><div class="big">${all.length?"Nothing matches":"No entries yet"}</div>${all.length?"Try another filter or search.":"Add an entry or import a file."}</div>`;return}
+  // Cases nearest their due date come first — paid entries (no urgency)
+  // sink to the bottom, and undated entries sit just above them.
+  list.sort((a,b)=>{
+    const pa=statusOf(a)==="paid",pb=statusOf(b)==="paid";
+    if(pa!==pb)return pa?1:-1;
+    const da=a.due||"9999-99-99",db=b.due||"9999-99-99";
+    return da.localeCompare(db);
+  });
+  $("ledger").innerHTML="";
+
+  if(!state.groupByCustomer){
+    list.forEach(r=>renderEntryRow(r,$("ledger")));
+    return;
+  }
+
+  // Grouped-by-customer view: same customer may have invoices under several
+  // NBFCs, so this groups across the currently filtered list regardless of
+  // which lender each invoice belongs to.
+  const groups={};
+  list.forEach(r=>{
+    const key=(r.customer||"").trim().toLowerCase()||"(no name)";
+    if(!groups[key])groups[key]={name:r.customer||"(no name)",entries:[],outstanding:0,collected:0,nbfcs:{}};
+    groups[key].entries.push(r);
+    groups[key].collected+=(Number(r.paidAmount)||0);groups[key].outstanding+=reportableOutstandingOf(r);
+    const nb=r.nbfc||"Unspecified";groups[key].nbfcs[nb]=(groups[key].nbfcs[nb]||0)+1;
+  });
+  const sortedKeys=Object.keys(groups).sort((a,b)=>groups[b].outstanding-groups[a].outstanding);
+
+  sortedKeys.forEach(key=>{
+    const g=groups[key];
+    const card=document.createElement("div");card.className="row";card.style.cursor="pointer";
+    const nbfcChips=Object.keys(g.nbfcs).map(n=>`${esc(n)}: ${g.nbfcs[n]}`).join(" · ");
+    const cardPhone=(g.entries.find(r=>r.phone)||{}).phone||"";
+    const cardEmail=(g.entries.find(r=>r.email)||{}).email||"";
+    const contactChip=(cardPhone||cardEmail)?` • ${[cardPhone,cardEmail].filter(Boolean).map(esc).join(" / ")}`:"";
+    card.innerHTML=`<div><div class="thumb placeholder">${g.entries.length}</div></div>
+      <div><div class="customer">${esc(g.name)}</div><div class="meta">${nbfcChips} • ${g.entries.length} invoice${g.entries.length===1?"":"s"}${contactChip}</div></div>
+      <div class="amount">${money(g.outstanding)}<div style="font-size:10px;color:var(--ink-soft);font-weight:400">outstanding</div></div>
+      <div class="status ${g.outstanding>0?"pending":"paid"}">${g.outstanding>0?"has dues":"all paid"}</div>`;
+    card.addEventListener("click",()=>{
+      state.openCustomer=(state.openCustomer===key)?null:key;
+      state.openId=null;
+      render();
+    });
+    $("ledger").appendChild(card);
+    if(state.openCustomer===key){
+      const wrap=document.createElement("div");wrap.className="detail";wrap.style.display="block";
+      wrap.addEventListener("click",e=>e.stopPropagation());
+      const actions=document.createElement("div");actions.style.cssText="grid-column:1 / -1;display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap";
+      const phone=(g.entries.find(r=>r.phone)||{}).phone||"";
+      const email=(g.entries.find(r=>r.email)||{}).email||"";
+      const urgent=isNearDue(g);
+      const safeKey=key.replace(/[^a-z0-9]/g,"");
+      const unpaidEntries=g.entries.filter(r=>statusOf(r)!=="paid");
+      actions.innerHTML=`
+        <button class="btn ${urgent?"btn-danger":"btn-ghost"}" id="copy-short-${safeKey}">Copy short reminder${urgent?" (due soon)":""}</button>
+        <button class="btn btn-ghost" id="copy-reminder-${safeKey}">Copy detailed reminder</button>
+        ${phone?`<a class="btn btn-gold" style="text-decoration:none" target="_blank" id="open-wa-${safeKey}">Open in WhatsApp</a>`:""}
+        ${phone?`<a class="btn btn-ghost" style="text-decoration:none" href="tel:${phone.replace(/[^0-9+]/g,"")}">Call ${esc(phone)}</a>`:""}
+        ${email?`<a class="btn btn-ghost" style="text-decoration:none" href="mailto:${esc(email)}">Email ${esc(email)}</a>`:""}
+        ${!phone&&!email?`<span style="font-size:11px;color:var(--ink-soft)">No phone/email on file — add it via Edit or the Contact &amp; VAN import.</span>`:""}
+        ${unpaidEntries.length>1?`<button class="btn btn-gold combined-pay-toggle">Record Combined Payment (${unpaidEntries.length} invoices)</button>`:""}
+      `;
+      if(unpaidEntries.length>1){
+        const cpForm=document.createElement("div");
+        cpForm.style.cssText="display:none;grid-column:1 / -1;margin-bottom:12px;padding:10px;border:1px dashed var(--line);border-radius:4px";
+        cpForm.innerHTML=`
+          <p style="font-size:11px;color:var(--ink-soft);margin:0 0 8px">
+            One screenshot, one payment — applied across this customer's ${unpaidEntries.length} unpaid invoice(s), oldest due date first.
+            Total currently outstanding: <b>${money(unpaidEntries.reduce((a,r)=>a+reportableOutstandingOf(r),0))}</b>.
+            Enter the full amount to close everything possible, or a smaller amount for a part-payment split across invoices.
+          </p>
+          <label style="font-size:11px">Amount paid (₹)</label><input type="number" min="0" step="0.01" class="cp-amount" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;margin-bottom:6px">
+          <label style="font-size:11px">Date this payment was made</label><input type="text" class="cp-date" placeholder="dd/mm/yyyy or 2-Aug-2026" value="${fmtDate(today())}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:3px;margin-bottom:6px">
+          <label style="font-size:11px">Screenshot for this payment (optional, applies to all affected invoices)</label><input type="file" accept="image/*" class="cp-file" style="width:100%;margin-bottom:8px">
+          <button class="btn btn-gold cp-save" style="width:100%">Save combined payment</button>
+          <div class="cp-preview" style="font-size:11px;color:var(--ink-soft);margin-top:8px"></div>
+        `;
+        wrap.appendChild(actions);
+        wrap.appendChild(cpForm);
+        const cpToggle=actions.querySelector(".combined-pay-toggle");
+        if(cpToggle)cpToggle.onclick=e=>{e.stopPropagation();cpForm.style.display=cpForm.style.display==="none"?"block":"none"};
+        const cpAmount=cpForm.querySelector(".cp-amount"),cpPreview=cpForm.querySelector(".cp-preview");
+        const updatePreview=()=>{
+          let remain=Number(cpAmount.value)||0;
+          if(remain<=0){cpPreview.textContent="";return}
+          const sorted=unpaidEntries.slice().sort((a,b)=>(a.due||"").localeCompare(b.due||"")||outstandingOf(a)-outstandingOf(b));
+          const lines=[];
+          for(const r of sorted){
+            if(remain<=0)break;
+            const owed=outstandingOf(r);
+            const applied=Math.min(remain,owed);
+            if(applied>0){lines.push(`${r.invoice||"(no ref)"}: ${money(applied)}${applied>=owed?" — fully closed":" — partial"}`);remain-=applied}
+          }
+          if(remain>0.01)lines.push(`⚠ ${money(remain)} left over — exceeds total outstanding, won't be allocated.`);
+          cpPreview.innerHTML=lines.map(esc).join("<br>");
+        };
+        cpAmount.oninput=updatePreview;
+        const cpSave=cpForm.querySelector(".cp-save");
+        cpSave.onclick=async e=>{
+          e.stopPropagation();
+          const totalAmt=Number(cpAmount.value)||0;
+          const dateInput=cpForm.querySelector(".cp-date");
+          const payDate=dateInput.value.trim()?parseDate(dateInput.value.trim()):today();
+          if(totalAmt<=0){banner("Enter a valid payment amount.","error");return}
+          if(dateInput.value.trim()&&!payDate){banner("Enter the payment date as dd/mm/yyyy or e.g. 2-Aug-2026.","error");return}
+          cpSave.disabled=true;cpSave.textContent="Saving…";
+          const finish=async(screenshotData)=>{
+            try{
+              const sorted=unpaidEntries.slice().sort((a,b)=>(a.due||"").localeCompare(b.due||"")||outstandingOf(a)-outstandingOf(b));
+              let remain=totalAmt;const touched=[];
+              for(const r of sorted){
+                if(remain<=0)break;
+                const owed=outstandingOf(r);
+                const applied=Math.min(remain,owed);
+                if(applied<=0)continue;
+                const list=Array.isArray(r.payments)?r.payments.slice():[];
+                list.push({amount:applied,date:payDate,screenshot:screenshotData||null,note:`Part of combined payment of ${money(totalAmt)} across ${unpaidEntries.length} invoice(s)`});
+                list.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+                r.payments=list;
+                // Add to whatever was already recorded as paid — some of
+                // that may have come from a lender's daily import, which
+                // never gets logged into this payments array, so
+                // recalculating purely from the array would silently lose
+                // it (this was exactly why a previously part-paid invoice
+                // could look stuck even after this payment applied).
+                r.paidAmount=(Number(r.paidAmount)||0)+applied;
+                r.status=r.paidAmount>=r.amount?"paid":"pending";
+                touched.push(r);
+                remain-=applied;
+              }
+              if(!touched.length){banner("Nothing to apply — all invoices may already be paid.","error");cpSave.disabled=false;cpSave.textContent="Save combined payment";return}
+              // Save each invoice independently — one failing (network blip,
+              // etc.) must not silently block or skip the others, and we
+              // need to know exactly which one had a problem if any did.
+              const results=await Promise.allSettled(touched.map(r=>updateRecord(r)));
+              const failed=results.map((res,i)=>({res,r:touched[i]})).filter(x=>x.res.status==="rejected");
+              state.openCustomer=null;
+              await refresh();
+              if(failed.length){
+                const refs=failed.map(x=>x.r.invoice||"(no ref)").join(", ");
+                banner(`Saved ${touched.length-failed.length} of ${touched.length} invoice(s). FAILED to save: ${refs} — please retry those individually via Record Payment.`,"error");
+              }else{
+                banner(`Payment split across ${touched.length} invoice(s).`+(remain>0.01?` ${money(remain)} could not be allocated (exceeds total due).`:""));
+              }
+            }catch(x){banner(x.message,"error");cpSave.disabled=false;cpSave.textContent="Save combined payment"}
+          };
+          const file=cpForm.querySelector(".cp-file").files[0];
+          if(file){
+            if(file.size>3e6){banner("Please use an image below 3 MB.","error");cpSave.disabled=false;cpSave.textContent="Save combined payment";return}
+            const rd=new FileReader();rd.onload=()=>finish(rd.result);rd.readAsDataURL(file);
+          }else{
+            await finish(null);
+          }
+        };
+      }else{
+        wrap.appendChild(actions);
+      }
+      // Sort by due date first (earliest/most urgent on top), then by
+      // creation time within the same due date — so invoices sharing a due
+      // date (e.g. 3 due 01-Sep, 2 due 03-Sep) naturally group together,
+      // each group preceded by a subtotal so no manual adding-up is needed.
+      const sub=document.createElement("div");sub.style.gridColumn="1 / -1";
+      const sortedEntries=g.entries.slice().sort((a,b)=>(a.due||"").localeCompare(b.due||"")||(b.createdAt||0)-(a.createdAt||0));
+      let lastDue=undefined;
+      sortedEntries.forEach(r=>{
+        if(r.due!==lastDue){
+          lastDue=r.due;
+          const dueGroup=sortedEntries.filter(x=>x.due===r.due);
+          const dueSubtotal=dueGroup.reduce((a,x)=>a+reportableOutstandingOf(x),0);
+          const head=document.createElement("div");
+          head.style.cssText="font:600 11px 'IBM Plex Mono',monospace;color:var(--gold-deep);margin:10px 0 4px;padding-top:8px;border-top:1px dashed var(--line)";
+          head.textContent=`Due ${fmtDate(r.due)} — ${dueGroup.length} invoice${dueGroup.length===1?"":"s"} • Subtotal: ${money(dueSubtotal)}`;
+          sub.appendChild(head);
+        }
+        renderEntryRow(r,sub);
+      });
+      wrap.appendChild(sub);
+      $("ledger").appendChild(wrap);
+      const copyShortBtn=document.getElementById("copy-short-"+safeKey);
+      if(copyShortBtn)copyShortBtn.onclick=e=>{
+        e.stopPropagation();
+        const msg=buildShortReminder(g);
+        navigator.clipboard.writeText(msg).then(()=>banner("Short reminder copied — paste it into WhatsApp.")).catch(()=>{
+          window.prompt("Copy this message:",msg);
+        });
+      };
+      const copyBtn=document.getElementById("copy-reminder-"+safeKey);
+      if(copyBtn)copyBtn.onclick=e=>{
+        e.stopPropagation();
+        const msg=buildCustomerReminder(g);
+        navigator.clipboard.writeText(msg).then(()=>banner("Reminder copied — paste it into WhatsApp.")).catch(()=>{
+          window.prompt("Copy this message:",msg);
+        });
+      };
+      const waLink=document.getElementById("open-wa-"+safeKey);
+      if(waLink){
+        const digits=phone.replace(/[^0-9]/g,"");
+        waLink.href="https://wa.me/"+digits+"?text="+encodeURIComponent(urgent?buildShortReminder(g):buildCustomerReminder(g));
+      }
+    }
+  });
+}
+async function refresh(){ $("ledger").innerHTML='<div class="loading">Loading ledger…</div>';try{state.records=await load();render();if(typeof misOpen!=="undefined"&&misOpen)renderMis();if(typeof termScheduleOpen!=="undefined"&&termScheduleOpen)renderTermSchedule();await renderImportFiles()}catch(e){$("ledger").innerHTML='<div class="empty"><div class="big">Could not load the ledger</div>'+esc(e.message)+'</div>'} }
+
+/* ---------- filters ---------- */
+document.querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-filter]").forEach(x=>x.classList.remove("active"));b.classList.add("active");state.filter=b.dataset.filter;render()});
+document.querySelectorAll("[data-nbfc]").forEach(b=>b.onclick=()=>{document.querySelectorAll("[data-nbfc]").forEach(x=>x.classList.remove("active"));b.classList.add("active");state.nbfc=b.dataset.nbfc;render()});
+$("search").oninput=e=>{state.search=e.target.value.toLowerCase();render()};
+$("group-toggle").onclick=()=>{
+  state.groupByCustomer=!state.groupByCustomer;
+  state.openId=null;state.openCustomer=null;
+  $("group-toggle").classList.toggle("active",state.groupByCustomer);
+  $("group-toggle").textContent=state.groupByCustomer?"View as list":"Group by Customer";
+  render();
+};
+$("term-filter-btn").onclick=()=>{document.querySelectorAll("[data-nbfc]").forEach(x=>x.classList.toggle("active",x.dataset.nbfc==="Term Loan"));state.nbfc="Term Loan";render();window.scrollTo({top:0,behavior:"smooth"})};
+
+/* ---------- MIS dashboard ---------- */
+function renderMis(){
+  const nbfcs=["Monedo","Blacksoil","Fintree","Term Loan"];
+  const t=today();
+  let grandOutstanding=0,grandCollectedToday=0,grandCollectedTotal=0;
+  const cards=nbfcs.map(nb=>{
+    const entries=state.records.filter(r=>r.nbfc===nb);
+    const outstanding=entries.reduce((a,r)=>a+reportableOutstandingOf(r),0);
+    const collectedTotal=entries.reduce((a,r)=>a+(Number(r.paidAmount)||0),0);
+    const collectedToday=entries.reduce((a,r)=>{
+      const todays=(Array.isArray(r.payments)?r.payments:[]).filter(p=>p.date===t);
+      return a+todays.reduce((s,p)=>s+(Number(p.amount)||0),0);
+    },0);
+    grandOutstanding+=outstanding;grandCollectedToday+=collectedToday;grandCollectedTotal+=collectedTotal;
+    return `<div class="mis-card"><h4>${nb}</h4>
+      <div class="mis-row"><span>Cases</span><b>${entries.length}</b></div>
+      <div class="mis-row"><span>Outstanding (incl. interest)</span><b>${money(outstanding)}</b></div>
+      <div class="mis-row"><span>Collected today</span><b>${money(collectedToday)}</b></div>
+      <div class="mis-row"><span>Collected till date</span><b>${money(collectedTotal)}</b></div>
+    </div>`;
+  }).join("");
+  $("mis-panel").innerHTML=`<div class="mis-grid">${cards}</div>
+    <div class="mis-card" style="margin-bottom:18px">
+      <h4>Overall — ${fmtDate(t)}</h4>
+      <div class="mis-row"><span>Total outstanding (incl. interest, all NBFCs)</span><b>${money(grandOutstanding)}</b></div>
+      <div class="mis-total"><span>Collected today</span><span>${money(grandCollectedToday)}</span></div>
+      <div class="mis-total"><span>Collected till date</span><span>${money(grandCollectedTotal)}</span></div>
+    </div>`;
+}
+let misOpen=false,termScheduleOpen=false;
+function closeAllPanels(){
+  misOpen=false;termScheduleOpen=false;
+  $("mis-toggle").classList.remove("active");$("mis-panel").style.display="none";
+  $("term-schedule-toggle").classList.remove("active");$("term-schedule-panel").style.display="none";
+}
+function syncLedgerVisibility(){
+  const anyOpen=misOpen||termScheduleOpen;
+  $("ledger").style.display=anyOpen?"none":"";
+  document.querySelector(".nbfc-row").style.display=anyOpen?"none":"";
+}
+$("mis-toggle").onclick=()=>{
+  const wasOpen=misOpen;closeAllPanels();
+  if(!wasOpen){misOpen=true;$("mis-toggle").classList.add("active");$("mis-panel").style.display="block";renderMis()}
+  syncLedgerVisibility();
+};
+
+/* ---------- Term Loan schedule sheet ---------- */
+// Renders every Term Loan entry as a single sheet — S.No, Business name,
+// EMI Amount, and one column per EMI due date — matching the layout of
+// the lender's own term-loan tracking sheet.
+function renderTermSchedule(){
+  const entries=state.records.filter(r=>r.nbfc==="Term Loan"&&Array.isArray(r.emiSchedule)&&r.emiSchedule.length);
+  if(!entries.length){
+    $("term-schedule-panel").innerHTML=`<div class="empty"><div class="big">No Term Loan entries yet</div>Add a Term Loan entry with a disbursement date to generate its EMI schedule here.</div>`;
+    return;
+  }
+  // Earliest disbursement first, then by customer name — same ordering as
+  // the reference sheet.
+  const sorted=entries.slice().sort((a,b)=>(a.disbDate||"").localeCompare(b.disbDate||"")||(a.customer||"").localeCompare(b.customer||""));
+  const maxEmis=Math.max(...sorted.map(r=>r.emiSchedule.length));
+  const ordinal=n=>{
+    const s=["th","st","nd","rd"],v=n%100;
+    return n+(s[(v-20)%10]||s[v]||s[0]);
+  };
+  let head=`<tr><th>S.No</th><th>Business name</th><th>EMI Amount</th>`;
+  for(let i=1;i<=maxEmis;i++)head+=`<th>${ordinal(i)} EMI</th>`;
+  head+=`</tr>`;
+  const rows=sorted.map((r,idx)=>{
+    const emiAmt=r.emiSchedule[0].amount;
+    const paidCount=Math.min(r.emiSchedule.length,Math.floor((Number(r.paidAmount)||0)/emiAmt));
+    let cells=`<td>${idx+1}</td><td>${esc(r.customer)}</td><td>${money(r.amount)}</td>`;
+    for(let i=0;i<maxEmis;i++){
+      const emi=r.emiSchedule[i];
+      if(!emi){cells+=`<td></td>`;continue}
+      const cls=i<paidCount?" class=\"emi-paid\"":(i===paidCount?" class=\"emi-next\"":"");
+      cells+=`<td${cls}>${fmtDateShort(emi.dueDate)}</td>`;
+    }
+    return `<tr>${cells}</tr>`;
+  }).join("");
+  $("term-schedule-panel").innerHTML=`<div class="term-schedule-wrap">
+    <h3>Term Loan — EMI Schedule</h3>
+    <p>${sorted.length} account${sorted.length===1?"":"s"} · 10 monthly EMIs, due on the 5th · green = paid, amber = next due.</p>
+    <table class="term-schedule-table"><thead>${head}</thead><tbody>${rows}</tbody></table>
+  </div>`;
+}
+$("term-schedule-toggle").onclick=()=>{
+  const wasOpen=termScheduleOpen;closeAllPanels();
+  if(!wasOpen){termScheduleOpen=true;$("term-schedule-toggle").classList.add("active");$("term-schedule-panel").style.display="block";renderTermSchedule()}
+  syncLedgerVisibility();
+};
+
+/* ---------- form ---------- */
+$("f-amount").oninput=e=>$("amount-words").textContent=e.target.value?indianWords(e.target.value):"";
+function updateTenureHint(){
+  const nbfc=$("f-nbfc").value,tenure=TENURE_DAYS[nbfc];
+  const hint=$("tenure-hint");
+  if(tenure){
+    hint.style.display="block";
+    hint.textContent=`${nbfc} SCF tenure: ${tenure} days from disbursement.`+($("f-disb").value?"":" Fill in Disbursement date to auto-calculate the due date.");
+  }else{
+    hint.style.display="none";
+  }
+}
+function autoFillDueFromTenure(){
+  const nbfc=$("f-nbfc").value,tenure=TENURE_DAYS[nbfc],disbIso=parseDate($("f-disb").value);
+  if(tenure&&disbIso&&!$("f-due").value){
+    const d=new Date(disbIso+"T00:00:00");
+    d.setDate(d.getDate()+tenure);
+    $("f-due").value=fmtDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
+  }
+  updateTenureHint();
+}
+$("f-nbfc").onchange=autoFillDueFromTenure;
+$("f-disb").onchange=autoFillDueFromTenure;
+$("dropzone").onclick=()=>$("f-file").click();
+$("f-file").onchange=e=>{if(e.target.files[0])readImage(e.target.files[0])};
+$("dropzone").ondragover=e=>{e.preventDefault()};$("dropzone").ondrop=e=>{e.preventDefault();if(e.dataTransfer.files[0])readImage(e.dataTransfer.files[0])};
+function readImage(file){if(!file.type.startsWith("image/")){$("form-error").textContent="Please select an image.";return}if(file.size>3e6){$("form-error").textContent="Please use an image below 3 MB.";return}const rd=new FileReader();rd.onload=()=>{$("dropzone").innerHTML=`<img src="${rd.result}" style="max-width:100%;max-height:120px"><div style="margin-top:5px"><b>Change screenshot</b></div>`;state.pendingImage=rd.result};rd.readAsDataURL(file)}
+function resetForm(){["f-customer","f-invoice","f-amount","f-due","f-notes","f-phone","f-email","f-van","f-disb"].forEach(id=>$(id).value="");$("f-roi").value="0";$("f-previnterest").value="0";$("f-nbfc").value="";$("amount-words").textContent="";$("tenure-hint").style.display="none";$("form-title").textContent="New Entry";$("submit-btn").textContent="Save entry";$("cancel-edit").style.display="none";state.editingId=null;state.pendingImage=null;$("dropzone").innerHTML="<b>Click to upload</b> or drop screenshot here"}
+function startEdit(r){state.editingId=r.id;$("f-customer").value=r.customer;$("f-nbfc").value=r.nbfc||"";$("f-invoice").value=r.invoice||"";$("f-phone").value=r.phone||"";$("f-email").value=r.email||"";$("f-van").value=r.van||"";$("f-amount").value=r.amount;$("f-due").value=r.due?fmtDate(r.due):"";$("f-disb").value=r.disbDate?fmtDate(r.disbDate):"";$("f-roi").value=r.roi||0;$("f-previnterest").value=r.prevInterest||0;$("f-notes").value=r.notes||"";$("amount-words").textContent=indianWords(r.amount);updateTenureHint();state.pendingImage=null;if(r.screenshot)$("dropzone").innerHTML=`<img src="${r.screenshot}" style="max-width:100%;max-height:120px"><div style="margin-top:5px"><b>Change screenshot</b></div>`;$("form-title").textContent="Edit Entry";$("submit-btn").textContent="Save changes";$("cancel-edit").style.display="block";window.scrollTo({top:0,behavior:"smooth"})}
+$("cancel-edit").onclick=resetForm;
+$("submit-btn").onclick=async()=>{
+  $("form-error").style.display="none";$("form-msg").style.display="none";
+  const customer=$("f-customer").value.trim(),amt=Number($("f-amount").value);
+  if(!customer){$("form-error").textContent="Customer name is required.";$("form-error").style.display="block";return}
+  if(!amt||amt<=0){$("form-error").textContent="Enter a valid amount.";$("form-error").style.display="block";return}
+  const dueRaw=$("f-due").value.trim(),disbRaw=$("f-disb").value.trim();
+  if(dueRaw&&!parseDate(dueRaw)){$("form-error").textContent="Enter the due date as dd/mm/yyyy or e.g. 2-Aug-2026.";$("form-error").style.display="block";return}
+  if(disbRaw&&!parseDate(disbRaw)){$("form-error").textContent="Enter the disbursement date as dd/mm/yyyy or e.g. 2-Aug-2026.";$("form-error").style.display="block";return}
+  try{
+    const roi=Number($("f-roi").value)||0,disbDate=parseDate($("f-disb").value),prevInterest=Number($("f-previnterest").value)||0;
+    if(state.editingId){
+      const r=state.records.find(x=>x.id===state.editingId);
+      // Editing here only touches invoice details — paidAmount/payments are
+      // managed separately via "Record Payment" so a routine edit never
+      // wipes out payment history.
+      Object.assign(r,{customer,nbfc:$("f-nbfc").value,invoice:$("f-invoice").value.trim(),phone:$("f-phone").value.trim(),email:$("f-email").value.trim(),van:$("f-van").value.trim(),amount:amt,status:(Number(r.paidAmount)||0)>=amt?"paid":r.status,due:parseDate($("f-due").value),notes:$("f-notes").value.trim(),screenshot:state.pendingImage||r.screenshot||null,roi,disbDate,prevInterest});
+      applyTermLoanSchedule(r);
+      await updateRecord(r);resetForm();await refresh();banner(r.emiSchedule&&r.emiSchedule.length?"Entry updated with a 10-month EMI schedule (5th of each month).":"Entry updated.");
+    }else{
+      const nbfcVal=$("f-nbfc").value;
+      const r={id:uid(),customer,nbfc:nbfcVal,invoice:$("f-invoice").value.trim(),phone:$("f-phone").value.trim(),email:$("f-email").value.trim(),van:$("f-van").value.trim(),amount:amt,paidAmount:0,payments:[],due:parseDate($("f-due").value),notes:$("f-notes").value.trim(),screenshot:state.pendingImage||null,status:"pending",createdAt:Date.now(),batch:"",roi,disbDate,prevInterest,emiSchedule:[]};
+      applyTermLoanSchedule(r);
+      await insertRecords([r]);resetForm();await refresh();banner(r.emiSchedule.length?"Entry saved with a 10-month EMI schedule (5th of each month).":"Entry saved.");
+    }
+  }catch(e){$("form-error").textContent=e.message;$("form-error").style.display="block"}
+};
+
+/* ---------- import ---------- */
+const headerMap={customer:["customer","customername","name","client","clientname","buyername","business"],nbfc:["nbfc","lender","nbfcname","loan","product"],invoice:["invoice","invoiceno","invoicenumber","reference","ref","referenceno","invoiceid","topupid","demandid"],amount:["amount","amountrs","amountinr","value","amountdue","disbamt"],paidAmount:["amountpaid","paidamount","amtpaid","amountpaidinr","paidamt"],osPrincipal:["osprincipal","principaloutstanding","outstandingprincipal"],due:["duedate","due","date"],notes:["notes","note","remarks","comments"],status:["status","paidstatus"],roi:["roi","roipct","interestrate","rateofinterest"],disbDate:["disbdate","disbursementdate","disbursaldate"],prevInterest:["previnterest","previousinterest","prevint"],phone:["phone","mobile","whatsapp","contact"],email:["email","emailid","emailaddress","mailid"],van:["van","virtualaccountnumber","virtualaccountno"],ageDays:["dpd","agedays","age"],interest:["interest","interestoutstanding"],totalOS:["totalos","totaloutstanding"]};
+function norm(s){return String(s||"").trim().toLowerCase().replace(/[^a-z]/g,"")}
+// Substring fallback for headers that don't exactly match headerMap — covers
+// real-world typos and variants (e.g. "Disbursment Date" missing the middle
+// "e", "Due Dt", "Cust Name") without needing every spelling enumerated.
+const headerFallback=[["disbDate",["disb"]],["due",["due"]],["customer",["cust","client","buyer","business"]],["invoice",["invoice","ref","topup","demand"]],["amount",["amount","amt"]],["roi",["roi","interest"]],["notes",["note","remark"]],["nbfc",["nbfc","lender"]],["phone",["phone","mobile","contact"]],["email",["email","mail"]],["van",["virtualaccount","van"]],["status",["status"]],["prevInterest",["previnterest","previousinterest"]]];
+function keyFor(h){
+  const n=norm(h);
+  for(const k in headerMap)if(headerMap[k].includes(n))return k;
+  for(const[k,subs]of headerFallback)if(subs.some(sub=>n.includes(sub)))return k;
+  return null;
+}
+// Exact, known column layouts for our 3 lenders — confirmed from real
+// ageing-report files. When the "This file is for" dropdown names one of
+// these, its columns are matched by exact normalized header first (in
+// priority order per field), overriding the generic fuzzy guesser. This is
+// what lets a report be uploaded completely unedited, straight from the
+// lender's email, with zero manual sheet rebuilding.
+const LENDER_PROFILES={
+  Monedo:{
+    customer:["buyername"],
+    invoice:["invoicenumber","invoiceno"],
+    due:["duedate"],
+    disbDate:["invoicedate"],
+    amount:["totalamountinr","totalamount"],
+    paidAmount:["amountpaidinr","amountpaid"],
+    osPrincipal:["outstandingamountinr","outstandingamount"],
+    ageDays:["agedays"]
+    // Deliberately NOT mapping totalOS here: Monedo has no real interest
+    // concept (it's deducted upfront), so its "Outstanding Amount" column
+    // is just amount-minus-paid — a plain figure, not a lender-calculated
+    // interest-inclusive total. Freezing display against it (like Fintree/
+    // Blacksoil's genuine Total O/S) would make in-app payments dated
+    // before the last import silently fail to reduce the shown balance.
+  },
+  Fintree:{
+    // "Customer" in Fintree's file is a numeric account ID, not a name —
+    // "Name" holds the actual customer name, so it must win.
+    customer:["name"],
+    invoice:["invoiceid"],
+    due:["duedate"],
+    disbDate:["disbdate"],
+    amount:["disbamt"],
+    osPrincipal:["osprincipal"],
+    roi:["roi"],
+    prevInterest:["previnterest"],
+    // "Int. Days" = days elapsed for interest calc; "DPD" is a separate
+    // column that's only nonzero once actually overdue past due date, so
+    // it looks blank/0 for current invoices — Int. Days is what we want.
+    ageDays:["intdays","dpd"],
+    interest:["interest"],
+    totalOS:["totalos"]
+  },
+  Blacksoil:{
+    customer:["business"],
+    invoice:["topupid","demandid"],
+    due:["duedate"],
+    disbDate:["disbursementdate"],
+    amount:["disbursedamount"],
+    osPrincipal:["principaloutstanding"],
+    roi:["roi"],
+    // Same story as Fintree: "DPD" is only nonzero once overdue. The real
+    // days-elapsed-for-interest figure is this long column name instead.
+    ageDays:["noofdaysforwhichinterestosiscalculated","dpd"],
+    interest:["interestoutstanding"],
+    totalOS:["totaloutstanding"]
+  }
+};
+function applyLenderProfile(map,rows0,lenderName){
+  const profile=LENDER_PROFILES[lenderName];
+  if(!profile)return map;
+  const normToOriginal={};
+  Object.keys(rows0).forEach(h=>{const n=norm(h);if(!normToOriginal[n])normToOriginal[n]=h});
+  const merged={...map};
+  Object.keys(profile).forEach(field=>{
+    for(const cand of profile[field]){
+      if(normToOriginal[cand]){merged[field]=normToOriginal[cand];break}
+    }
+  });
+  return merged;
+}
+// Minimal RFC4180 CSV parser: everything stays a raw string, so date/number
+// values are never auto-detected or reformatted by us here — that job
+// belongs entirely to parseDate/amount(), applied later per mapped column.
+function parseCsvText(text){
+  const rows=[];let row=[],field="",inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQuotes){
+      if(c==='"'){if(text[i+1]==='"'){field+='"';i++}else inQuotes=false}
+      else field+=c;
+    }else{
+      if(c==='"')inQuotes=true;
+      else if(c===','){row.push(field);field=""}
+      else if(c==='\r'){/* skip — handled by \n below */}
+      else if(c==='\n'){row.push(field);rows.push(row);row=[];field=""}
+      else field+=c;
+    }
+  }
+  if(field.length||row.length){row.push(field);rows.push(row)}
+  while(rows.length&&rows[rows.length-1].every(f=>f===""))rows.pop();
+  if(!rows.length)return[];
+  const headers=rows[0];
+  return rows.slice(1).filter(r=>r.some(f=>f!=="")).map(r=>{
+    const obj={};headers.forEach((h,idx)=>{obj[h]=r[idx]!==undefined?r[idx]:""});return obj;
+  });
+}
+// CSV files are read as plain text through our own parser above — SheetJS's
+// CSV reader auto-detects and reformats date-like text using its own
+// (US-leaning) guess for ambiguous dates, which silently corrupts dd/mm/yyyy
+// data before our strict parseDate() ever sees it. .xlsx/.xls files don't
+// have this problem (their date cells are unambiguous numeric values), so
+// those still go through SheetJS + cellDates as before.
+async function readRowsFromFile(file){
+  if(/\.csv$/i.test(file.name)){
+    const text=await file.text();
+    return parseCsvText(text);
+  }
+  const data=await file.arrayBuffer(),wb=XLSX.read(data,{type:"array",cellDates:true});
+  // Multi-sheet lender files (e.g. Monedo sends "By Buyer" summary + the
+  // real "Invoices" detail sheet in the same workbook) — always prefer the
+  // sheet holding actual invoice-level rows, not just SheetNames[0].
+  // 1) A sheet literally named "Invoices" (any case) wins outright.
+  // 2) Otherwise pick whichever sheet has the most data rows, since
+  //    summary/notes sheets are typically much shorter than the real list.
+  let sheetName=wb.SheetNames.find(n=>/invoice/i.test(n));
+  if(!sheetName){
+    let bestLen=-1;
+    wb.SheetNames.forEach(n=>{
+      const len=XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:""}).length;
+      if(len>bestLen){bestLen=len;sheetName=n}
+    });
+  }
+  return XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{defval:""});
+}
+$("import-btn").onclick=()=>$("import-file").click();
+$("import-file").onchange=async e=>{
+  const file=e.target.files[0];if(!file)return;e.target.value="";
+  try{
+    const rows=await readRowsFromFile(file);
+    if(!rows.length)throw new Error("No rows found.");
+    let map={};Object.keys(rows[0]).forEach(h=>{const k=keyFor(h);if(k&&!map[k])map[k]=h});
+    const explicitNbfc=$("import-nbfc").value;
+    if(explicitNbfc&&LENDER_PROFILES[explicitNbfc])map=applyLenderProfile(map,rows[0],explicitNbfc);
+    if(!map.customer)throw new Error('Could not find a Customer column.');
+    const batchId=uid();const batch=batchId+"::"+file.name;const toAdd=[],toUpdate=[],skipped=[];
+    // Existing entries keyed by invoice number, for upsert matching — a
+    // re-import of the same file (or the same invoices with extra columns
+    // filled in, e.g. ROI added later) updates in place instead of
+    // creating duplicates.
+    const existingByInvoice={};
+    state.records.forEach(r=>{if(r.invoice)existingByInvoice[r.invoice.trim().toLowerCase()]=r});
+    // Detect mm/dd vs dd/mm once per column (see detectColumnDateFormat) so
+    // every row in this import is read consistently, instead of guessing
+    // format cell-by-cell.
+    const dueFmt=map.due?detectColumnDateFormat(rows.map(r=>r[map.due])):"DD_MM";
+    const disbFmt=map.disbDate?detectColumnDateFormat(rows.map(r=>r[map.disbDate])):"DD_MM";
+    if(dueFmt==="CONFLICT")throw new Error(`The "${map.due}" column has dates in more than one format — please make it consistent (all dd/mm/yyyy or all mm/dd/yyyy) and re-import.`);
+    if(disbFmt==="CONFLICT")throw new Error(`The "${map.disbDate}" column has dates in more than one format — please make it consistent (all dd/mm/yyyy or all mm/dd/yyyy) and re-import.`);
+
+    rows.forEach((row,i)=>{
+      const customer=String(row[map.customer]||"").trim();
+      let a=map.amount?amount(row[map.amount]):null;
+      const osPrincipal=map.osPrincipal?amount(row[map.osPrincipal]):null;
+      const directPaid=map.paidAmount?amount(row[map.paidAmount]):null;
+      // If the file only has O/S Principal (no separate original amount
+      // column), treat that as the amount with nothing paid yet.
+      if((a===null||a<=0)&&osPrincipal!==null)a=osPrincipal;
+      if(!customer){skipped.push("Row "+(i+2)+": missing customer");return}
+      if(a===null||a<=0){skipped.push("Row "+(i+2)+": invalid amount");return}
+      // Paid amount: prefer a direct "Amount Paid" column when the file
+      // provides one (e.g. Monedo). Otherwise derive it as original amount
+      // minus what's still outstanding (e.g. Fintree/Blacksoil, which give
+      // O/S Principal but not a separate paid figure).
+      const paidAmount=(directPaid!==null&&directPaid>=0)
+        ? directPaid
+        : ((osPrincipal!==null&&a>osPrincipal)?Math.max(0,a-osPrincipal):0);
+
+      // The dropdown selection is always authoritative: relying on a
+      // detected "nbfc"/"lender"-looking column is risky, since some
+      // lenders' files have an unrelated column that happens to match
+      // (e.g. Fintree's "Product" column just says "STERLION", your own
+      // company name — not an NBFC). If you explicitly picked a lender in
+      // the dropdown, that wins outright; auto-detection is only used as a
+      // fallback when nothing was selected.
+      let nbfc="";
+      if(explicitNbfc){
+        nbfc=explicitNbfc;
+      }else{
+        let raw=map.nbfc?String(row[map.nbfc]||"").trim():"";
+        const known=["Monedo","Blacksoil","Fintree","Term Loan"];
+        const rawLower=raw.toLowerCase();
+        const km=known.find(x=>{
+          const k=x.toLowerCase();
+          return rawLower===k||rawLower.startsWith(k+" ")||rawLower.startsWith(k+"_")||rawLower.includes(k);
+        });
+        if(km)nbfc=km;
+        else if(raw)nbfc=raw;
+        else{
+          const fileName=file.name.toLowerCase();
+          const fromFile=known.find(x=>fileName.includes(x.toLowerCase().replace(/\s+/g,""))||fileName.includes(x.toLowerCase()));
+          nbfc=fromFile||"";
+        }
+      }
+      let st="pending";if(map.status&&String(row[map.status]||"").trim().toLowerCase()==="paid")st="paid";
+      if(paidAmount>=a)st="paid";
+      const roi=map.roi?(parseFloat(String(row[map.roi]).replace(/[^0-9.]/g,""))||0):0;
+      const disbDate=map.disbDate?parseDateWithFormat(row[map.disbDate],disbFmt):"";
+      const prevInterest=map.prevInterest?(parseFloat(String(row[map.prevInterest]).replace(/[^0-9.]/g,""))||0):0;
+      const phone=map.phone?String(row[map.phone]||"").trim():"";
+      const email=map.email?String(row[map.email]||"").trim():"";
+      const van=map.van?String(row[map.van]||"").trim():"";
+      const invoice=map.invoice?String(row[map.invoice]||"").trim():"";
+      const due=map.due?parseDateWithFormat(row[map.due],dueFmt):"";
+      const notes=map.notes?String(row[map.notes]||"").trim():"";
+      // Trust the lender's own reported ageing/interest figures exactly as
+      // given, rather than recalculating them — different lenders use
+      // different day-count conventions and rounding, so re-deriving these
+      // from scratch can drift from what the lender itself shows. These
+      // get refreshed fresh on every import (importedAsOf marks when).
+      const importedAgeDays=map.ageDays?(parseInt(String(row[map.ageDays]).replace(/[^0-9\-]/g,""),10)):null;
+      const importedInterest=map.interest?amount(row[map.interest]):null;
+      const importedTotalOS=map.totalOS?amount(row[map.totalOS]):null;
+      const importedAsOf=(importedAgeDays!==null||importedInterest!==null||importedTotalOS!==null)?today():null;
+
+      const existing=invoice?existingByInvoice[invoice.trim().toLowerCase()]:null;
+      if(existing){
+        // Update in place — never overwrite payment history, only fill in
+        // fields this file actually provides values for.
+        if(customer)existing.customer=customer;
+        if(nbfc)existing.nbfc=nbfc;
+        if(a)existing.amount=a;
+        if(due)existing.due=due;
+        if(notes)existing.notes=notes;
+        if(roi)existing.roi=roi;
+        if(disbDate)existing.disbDate=disbDate;
+        if(prevInterest)existing.prevInterest=prevInterest;
+        if(phone)existing.phone=phone;
+        if(email)existing.email=email;
+        if(van)existing.van=van;
+        if(importedAsOf){
+          existing.importedAgeDays=importedAgeDays;
+          existing.importedInterest=importedInterest;
+          existing.importedTotalOS=importedTotalOS;
+          existing.importedAsOf=importedAsOf;
+        }
+        // Only trust the file's paid amount if it implies MORE paid than
+        // what we already know — never lose recorded part-payments.
+        if(paidAmount>(Number(existing.paidAmount)||0)){
+          existing.paidAmount=paidAmount;
+          existing.status=paidAmount>=existing.amount?"paid":existing.status;
+        }
+        applyTermLoanSchedule(existing);
+        toUpdate.push(existing);
+      }else{
+        const r={id:uid(),customer,nbfc,invoice,amount:a,due,notes,screenshot:null,status:st,createdAt:Date.now()+i,batch,roi,disbDate,prevInterest,phone,email,van,paidAmount,payments:[],emiSchedule:[],importedAgeDays,importedInterest,importedTotalOS,importedAsOf};
+        applyTermLoanSchedule(r);
+        toAdd.push(r);
+      }
+    });
+    if(!toAdd.length&&!toUpdate.length)throw new Error("Nothing valid to import.");
+    $("import-status").textContent=`Importing ${toAdd.length} new, updating ${toUpdate.length} existing…`;
+    if(toAdd.length)await insertRecords(toAdd);
+    for(const r of toUpdate)await updateRecord(r);
+    await refresh();
+    const allTouched=toAdd.concat(toUpdate);
+    const nbfcCounts={};allTouched.forEach(r=>{const k=r.nbfc||"(none)";nbfcCounts[k]=(nbfcCounts[k]||0)+1});
+    const nbfcSummary=Object.keys(nbfcCounts).map(k=>`${k}: ${nbfcCounts[k]}`).join(", ");
+    $("import-status").textContent=`Added ${toAdd.length} new, updated ${toUpdate.length} existing (${nbfcSummary})${skipped.length?` • Skipped ${skipped.length}`:""}.`;
+    $("import-nbfc").value="";
+    banner("Import completed.");
+  }catch(e){$("import-status").textContent="Import failed: "+e.message;$("import-status").style.color="var(--warn)"}
+};
+
+/* ---------- update Virtual Account Numbers from a separate file ---------- */
+const vanHeaderMap={customer:["customername","name","clientname","buyername"],van:["virtualaccountnumber","virtualaccountno","van","account"],ifsc:["ifsc","ifsccode"],beneficiary:["beneficiaryname","accountname","beneficiary"],phone:["phone","mobile","whatsapp","contact","contactnumber"],email:["email","emailid","emailaddress","mailid"]};
+function vanKeyFor(h){const n=norm(h);for(const k in vanHeaderMap)if(vanHeaderMap[k].includes(n))return k;return null}
+$("van-btn").onclick=()=>$("van-file").click();
+$("van-file").onchange=async e=>{
+  const file=e.target.files[0];if(!file)return;e.target.value="";
+  $("van-status").style.color="";$("van-status").textContent="Reading file…";
+  try{
+    const rows=await readRowsFromFile(file);
+    if(!rows.length)throw new Error("No rows found.");
+    const map={};Object.keys(rows[0]).forEach(h=>{const k=vanKeyFor(h);if(k&&!map[k])map[k]=h});
+    if(!map.customer)throw new Error("Could not find a customer_name column.");
+    if(!map.van&&!map.phone&&!map.email)throw new Error("Could not find a Phone, Email, or Virtual Account Number column to update.");
+    const nbfcFilter=$("van-nbfc").value;
+
+    // Build lookup: normalized file customer name -> contact/VAN values
+    const contactRows=rows.map(row=>({
+      name:String(row[map.customer]||"").trim(),
+      norm:norm(row[map.customer]),
+      van:map.van?String(row[map.van]||"").trim():"",
+      phone:map.phone?String(row[map.phone]||"").trim():"",
+      email:map.email?String(row[map.email]||"").trim():""
+    })).filter(v=>v.name&&(v.van||v.phone||v.email));
+
+    // Match against every currently loaded ledger entry by normalized name
+    // (ledger customer names often carry an NBFC suffix, so this checks
+    // whether the ledger name starts with the file's plain name).
+    const toUpdate=[];
+    const matchedNames=new Set();
+    state.records.forEach(r=>{
+      if(nbfcFilter&&r.nbfc!==nbfcFilter)return;
+      const rn=norm(r.customer);
+      const hit=contactRows.find(v=>v.norm.length>3&&(rn.startsWith(v.norm)||rn.includes(v.norm)));
+      if(!hit)return;
+      const patch={};
+      if(hit.van&&r.van!==hit.van)patch.van=hit.van;
+      if(hit.phone&&r.phone!==hit.phone)patch.phone=hit.phone;
+      if(hit.email&&r.email!==hit.email)patch.email=hit.email;
+      if(Object.keys(patch).length){toUpdate.push({r,patch});matchedNames.add(hit.name)}
+    });
+
+    if(!toUpdate.length){
+      $("van-status").textContent="No matching ledger entries found to update. Check customer names match, or try a specific NBFC filter.";
+      $("van-status").style.color="var(--warn)";
+      return;
+    }
+
+    $("van-status").textContent=`Updating ${toUpdate.length} invoice(s)…`;
+    for(const {r,patch} of toUpdate){
+      await sb("payment_ledger_entries?id=eq."+encodeURIComponent(r.id),{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify(patch)});
+    }
+    await refresh();
+    const unmatchedCount=contactRows.length-matchedNames.size;
+    $("van-status").style.color="";
+    $("van-status").textContent=`Updated ${toUpdate.length} invoice(s) across ${matchedNames.size} customer(s).`+(unmatchedCount?` ${unmatchedCount} customer(s) in the file had no matching ledger entries.`:"");
+    banner("Contact details updated.");
+  }catch(e){$("van-status").textContent="Update failed: "+e.message;$("van-status").style.color="var(--warn)"}
+};
+
+/* ---------- imported file batches ---------- */
+async function deleteImportedBatch(batchId,confirmedPaymentLoss){
+  if(!currentIsAdmin) throw new Error("Only Admin can delete imported files.");
+
+  const batch=String(batchId||"").trim();
+  if(!batch) throw new Error("This import has no batch ID.");
+
+  const rows=state.records.filter(r=>String(r.batch||"")===batch);
+  if(!rows.length) throw new Error("No entries from this import were found.");
+
+  // Deleting an import batch permanently deletes every invoice that was
+  // originally created in it — including any that have since been marked
+  // paid, part-paid, or have payment screenshots attached. That has caused
+  // real data loss before, so if any exist, require the caller to pass
+  // explicit confirmation (typed, not just clicked) before proceeding.
+  const atRisk=rows.filter(r=>(Number(r.paidAmount)||0)>0||(Array.isArray(r.payments)&&r.payments.length>0));
+  if(atRisk.length&&!confirmedPaymentLoss){
+    const err=new Error("NEEDS_PAYMENT_CONFIRMATION");
+    err.atRisk=atRisk;
+    throw err;
+  }
+
+  // Delete the complete batch in one request. This is reliable for large
+  // CSV files and avoids hundreds of separate DELETE calls.
+  await sb(
+    "payment_ledger_entries?import_batch_id=eq."+encodeURIComponent(batch),
+    {
+      method:"DELETE",
+      headers:{"Prefer":"return=representation"}
+    }
+  );
+
+  const remaining=await sb(
+    "payment_ledger_entries?select=id&import_batch_id=eq."+encodeURIComponent(batch)
+  );
+
+  if(Array.isArray(remaining) && remaining.length){
+    throw new Error(
+      "Delete was blocked by Supabase Row Level Security. Check the DELETE policy and try again."
+    );
+  }
+
+  return rows.length;
+}
+
+async function renderImportFiles(){
+  const list={};
+
+  state.records.filter(r=>r.batch).forEach(r=>{
+    if(!list[r.batch]){
+      list[r.batch]={
+        batch:r.batch,
+        count:0,
+        amount:0,
+        created:r.createdAt
+      };
+    }
+    list[r.batch].count++;
+    list[r.batch].amount+=r.amount;
+    list[r.batch].created=Math.min(list[r.batch].created,r.createdAt);
+  });
+
+  const arr=Object.values(list).sort((a,b)=>b.created-a.created);
+
+  if(!arr.length){
+    $("file-list").innerHTML=
+      '<div style="font-size:11px;color:var(--ink-soft);padding:8px 0">'+
+      'No imported files yet. New imports will appear here with a delete option.'+
+      '</div>';
+    return;
+  }
+
+  $("file-list").innerHTML="";
+
+  arr.forEach(x=>{
+    const d=document.createElement("div");
+    d.className="import-file-row";
+
+    const info=document.createElement("div");
+    const name=document.createElement("div");
+    name.className="import-file-name";
+    const rawBatch=String(x.batch||"");
+    const sep=rawBatch.indexOf("::");
+    const fileName=sep>=0 ? rawBatch.slice(sep+2) : "";
+    name.textContent=fileName
+      ? fileName
+      : "Imported file • "+new Date(x.created).toLocaleString("en-IN");
+
+    const meta=document.createElement("div");
+    meta.className="import-file-meta";
+    meta.textContent=x.count+" entries • "+money(x.amount);
+
+    info.appendChild(name);
+    info.appendChild(meta);
+
+    const btn=document.createElement("button");
+    btn.className="btn btn-danger";
+    btn.type="button";
+    btn.textContent="Delete file";
+
+    btn.onclick=async e=>{
+      e.preventDefault();
+      e.stopPropagation();
+
+      if(!currentIsAdmin){
+        banner("Only Admin can delete imported files.","error");
+        return;
+      }
+
+      const ok=confirm(
+        "Delete this imported file?\n\n"+
+        x.count+" entries • "+money(x.amount)+
+        "\n\nThis will permanently delete all entries from this import."
+      );
+      if(!ok)return;
+
+      const oldText=btn.textContent;
+      btn.disabled=true;
+      btn.textContent="Deleting…";
+
+      try{
+        const deleted=await deleteImportedBatch(x.batch);
+
+        // Reload from Supabase so the screen exactly matches the database.
+        await refresh();
+        banner("Imported file deleted. "+deleted+" entries removed.");
+      }catch(e){
+        if(e.message==="NEEDS_PAYMENT_CONFIRMATION"){
+          const names=[...new Set(e.atRisk.map(r=>r.customer))];
+          const preview=names.slice(0,5).join(", ")+(names.length>5?` and ${names.length-5} more`:"");
+          const typed=prompt(
+            `WARNING: ${e.atRisk.length} invoice(s) in this file have recorded payments or screenshots `+
+            `(${preview}). Deleting will permanently erase that payment history — it cannot be undone.\n\n`+
+            `Type DELETE in capital letters to confirm you understand and still want to proceed:`
+          );
+          if(typed!=="DELETE"){
+            btn.disabled=false;
+            btn.textContent=oldText;
+            banner("Delete cancelled — payment history was not touched.");
+            return;
+          }
+          try{
+            const deleted2=await deleteImportedBatch(x.batch,true);
+            await refresh();
+            banner("Imported file deleted, including "+e.atRisk.length+" invoice(s) with payment history. "+deleted2+" entries removed.");
+          }catch(e2){
+            btn.disabled=false;
+            btn.textContent=oldText;
+            banner(e2.message,"error");
+          }
+          return;
+        }
+        btn.disabled=false;
+        btn.textContent=oldText;
+        banner(e.message||"Could not delete imported file.","error");
+      }
+    };
+
+    d.appendChild(info);
+    d.appendChild(btn);
+    $("file-list").appendChild(d);
+  });
+}
+
+/* ---------- restore session ---------- */
+(async()=>{try{if(accessToken){const res=await fetch(SB_URL+"/auth/v1/user",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+accessToken}});if(res.ok){const u=await res.json();await applyUser(u);return}}}catch(e){}document.body.classList.add("auth-required")})();
+})();
+</script>
+</body>
+</html>
